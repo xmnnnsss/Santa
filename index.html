@@ -1,0 +1,3284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Santa • Cozy Gift Exchange</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Mali & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        serif: ['"Mali"', 'cursive', 'sans-serif'],
+                        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        evergreen: {
+                            800: '#16382C',
+                            900: '#0F2920',
+                            950: '#091A14',
+                        },
+                        cream: {
+                            50: '#FDFBF7',
+                            100: '#F7F2E7',
+                            200: '#EFE5D1',
+                        },
+                        crimson: {
+                            600: '#C82828',
+                            700: '#A61C1C',
+                        },
+                        gold: {
+                            400: '#F2C94C',
+                            500: '#D4AF37',
+                            600: '#B59020',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        :root {
+            --font-display: "Mali", cursive, sans-serif;
+            --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+        }
+
+        body {
+            background-color: #0F2920;
+            background-image: radial-gradient(circle at 50% 0%, #1C4A3A 0%, #0F2920 65%, #091A14 100%);
+            color: #FDFBF7;
+            font-family: var(--font-body);
+            overflow-x: hidden;
+        }
+
+        .font-serif {
+            font-family: var(--font-display) !important;
+            letter-spacing: -0.01em;
+        }
+
+        #snowCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F2920;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #234E3F;
+            border-radius: 3px;
+        }
+
+        .cozy-card {
+            background: #FDFBF7;
+            color: #16382C;
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            box-shadow: 0 18px 40px -10px rgba(5, 16, 12, 0.55);
+        }
+
+        .glass-panel {
+            background: rgba(22, 56, 44, 0.72);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(242, 201, 76, 0.22);
+            box-shadow: 0 14px 35px -8px rgba(5, 16, 12, 0.45);
+        }
+
+        .ribbon-stitch {
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(242, 201, 76, 0.14),
+                rgba(242, 201, 76, 0.14) 10px,
+                transparent 10px,
+                transparent 20px
+            );
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+        .animate-float {
+            animation: floatSlow 4s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative selection:bg-crimson-600 selection:text-white">
+
+    <!-- Gentle Falling Snow Canvas -->
+    <canvas id="snowCanvas"></canvas>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="relative z-10 border-b border-gold-500/20 bg-evergreen-950/75 backdrop-blur-md">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+            <button type="button" onclick="handleBrandClick()" class="flex items-center gap-3 text-left group focus:outline-none">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-crimson-600 to-crimson-700 border border-gold-400/40 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <i data-lucide="gift" class="w-5 h-5 text-cream-50"></i>
+                </div>
+                <div>
+                    <h1 class="font-serif text-xl sm:text-2xl font-bold tracking-tight text-cream-50 flex items-center gap-2">
+                        Secret Santa
+                        <span class="text-xs font-sans font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full bg-gold-500/20 text-gold-400 border border-gold-400/30">2027</span>
+                    </h1>
+                    <p class="text-xs text-cream-200/70 hidden sm:block">Cozy Gift Exchange & Wishlist Organizer</p>
+                </div>
+            </button>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Notifications Bell Button -->
+                <button type="button" id="headerNotifBtn" onclick="openNotificationsModal()" title="Notifications"
+                    class="hidden relative p-2.5 rounded-xl bg-evergreen-800/85 hover:bg-evergreen-800 border border-gold-400/25 text-cream-50 transition-colors">
+                    <i data-lucide="bell" class="w-4 h-4 text-gold-400"></i>
+                    <span id="notifUnreadBadge" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-crimson-600 text-white text-[10px] font-extrabold flex items-center justify-center shadow">0</span>
+                </button>
+
+                <!-- Active User Profile Pill -->
+                <div id="headerUserBadge" class="hidden items-center gap-2 px-2.5 py-1.5 rounded-xl bg-evergreen-800/85 border border-gold-400/25">
+                    <div id="headerUserAvatar" class="w-6 h-6 rounded-lg overflow-hidden shrink-0"></div>
+                    <span id="headerUserName" class="text-xs font-bold text-cream-50 max-w-[100px] truncate"></span>
+                    <button type="button" onclick="logoutUser()" title="Switch / Sign Out" class="ml-1 px-2 py-0.5 rounded-lg bg-evergreen-950/70 hover:bg-crimson-600/80 text-[10px] font-bold text-cream-200 hover:text-white transition-colors">
+                        Sign Out
+                    </button>
+                </div>
+                <div id="headerActions" class="flex items-center gap-2 sm:gap-3"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="relative z-10 flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+        <!-- VIEW 0: AUTH GATE (CREATE ACCOUNT OR LOGIN WITH NAME + 4-DIGIT PIN) -->
+        <div id="authView" class="max-w-md mx-auto py-4 sm:py-10 space-y-6">
+            <div class="text-center space-y-3">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-evergreen-800/80 border border-gold-400/30 text-gold-400 text-xs font-semibold tracking-wide animate-float">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Welcome to Secret Santa 2027</span>
+                </div>
+                <h2 class="font-serif text-3xl sm:text-4xl font-bold text-cream-50 leading-tight">
+                    Sign in to get <span class="text-gold-400">started</span>
+                </h2>
+                <p class="text-cream-200/80 text-sm leading-relaxed">
+                    Create a quick profile or log in with your Name & 4-digit PIN to access your rooms, wishlists, and secret matches.
+                </p>
+            </div>
+
+            <div class="cozy-card rounded-3xl p-6 sm:p-7 space-y-5">
+                <!-- Auth Mode Switcher -->
+                <div class="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-cream-200/70 border border-evergreen-800/10">
+                    <button type="button" id="authTabCreateBtn" onclick="switchAuthTab('create')"
+                        class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-crimson-600 text-white shadow transition-all">
+                        Create Profile
+                    </button>
+                    <button type="button" id="authTabLoginBtn" onclick="switchAuthTab('login')"
+                        class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-evergreen-900 hover:bg-cream-100 transition-all">
+                        Log In
+                    </button>
+                </div>
+
+                <!-- Avatar Picker (shown on Create Profile) -->
+                <div id="authAvatarWrapper">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800">Pick Your Animal Avatar</label>
+                        <span id="authSelectedAvatarLabel" class="text-xs font-semibold text-crimson-700">Reindeer</span>
+                    </div>
+                    <input type="hidden" id="authAvatarInput" value="reindeer">
+                    <div id="authAvatarPickerGrid" class="grid grid-cols-4 sm:grid-cols-8 gap-2"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Your Name / Nickname *</label>
+                    <input type="text" id="authNameInput" maxlength="35" placeholder="e.g., Maya Lin"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('authPinInput').focus();}"
+                        class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-semibold">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">4-Digit PIN Code *</label>
+                    <input type="password" id="authPinInput" maxlength="4" inputmode="numeric" placeholder="••••"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();submitAuthForm();}"
+                        class="w-full px-4 py-3.5 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/35 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-mono text-2xl tracking-[0.45em] text-center">
+                    <p id="authPinHelperText" class="text-[11px] text-evergreen-800/65 mt-1">
+                        Choose a 4-digit PIN you'll remember—you'll use it to log in on any device.
+                    </p>
+                </div>
+
+                <button type="button" id="authSubmitBtn" onclick="submitAuthForm()"
+                    class="w-full py-3.5 px-5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold shadow-lg shadow-crimson-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99]">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-gold-400"></i>
+                    <span id="authSubmitBtnLabel">Create Profile & Continue</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW 1: LANDING (2 ACTION BUTTONS + SAVED ROOMS DASHBOARD) -->
+        <div id="landingView" class="hidden max-w-xl mx-auto py-6 sm:py-12 space-y-10">
+            <div class="text-center space-y-4">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-evergreen-800/80 border border-gold-400/30 text-gold-400 text-xs font-semibold tracking-wide animate-float">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Welcome back, <span id="landingWelcomeName">Friend</span>!</span>
+                </div>
+                <h2 class="font-serif text-4xl sm:text-5xl font-bold text-cream-50 leading-tight">
+                    Gather your friends for <span class="text-gold-400">Secret Santa</span>
+                </h2>
+                <p class="text-cream-200/80 text-base sm:text-lg leading-relaxed max-w-md mx-auto">
+                    Create a festive room, write your wishlists, and let our magic hat pair everyone up secretly.
+                </p>
+            </div>
+
+            <!-- 2 Main Action Buttons -->
+            <div class="space-y-4 max-w-md mx-auto">
+                <button type="button" onclick="openCreateRoomView()"
+                    class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-crimson-600 to-crimson-700 hover:from-crimson-700 hover:to-crimson-700 text-white shadow-xl shadow-crimson-900/40 border border-gold-400/30 flex items-center justify-between group transition-all hover:scale-[1.01]">
+                    <div class="flex items-center gap-4 text-left">
+                        <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                            <i data-lucide="party-popper" class="w-6 h-6 text-gold-400"></i>
+                        </div>
+                        <div>
+                            <span class="font-serif text-xl font-bold block leading-tight">Create Room</span>
+                            <span class="text-xs text-cream-100/85">Start a new gift exchange for your group</span>
+                        </div>
+                    </div>
+                    <i data-lucide="arrow-right" class="w-5 h-5 text-gold-400 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+
+                <button type="button" onclick="openJoinRoomView()"
+                    class="w-full py-4 px-6 rounded-2xl bg-cream-50 hover:bg-cream-100 text-evergreen-950 shadow-xl border border-gold-400/40 flex items-center justify-between group transition-all hover:scale-[1.01]">
+                    <div class="flex items-center gap-4 text-left">
+                        <div class="w-12 h-12 rounded-xl bg-evergreen-900 text-gold-400 flex items-center justify-center shrink-0">
+                            <i data-lucide="key-round" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <span class="font-serif text-xl font-bold text-evergreen-950 block leading-tight">Join Room</span>
+                            <span class="text-xs text-evergreen-800/75">Enter a 6-character room code</span>
+                        </div>
+                    </div>
+                    <i data-lucide="arrow-right" class="w-5 h-5 text-crimson-600 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+
+            <!-- Saved Rooms on Landing Dashboard -->
+            <div id="landingRoomsSection" class="hidden max-w-md mx-auto pt-2 space-y-3">
+                <div class="flex items-center justify-between px-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-gold-400/90 flex items-center gap-1.5">
+                        <i data-lucide="history" class="w-3.5 h-3.5"></i>
+                        <span>Your Rooms</span>
+                    </span>
+                    <span class="text-[11px] text-cream-200/60">Tap to re-enter</span>
+                </div>
+                <div id="landingRoomsList" class="space-y-2.5"></div>
+            </div>
+        </div>
+
+        <!-- VIEW 1B: CREATE ROOM PAGE -->
+        <div id="createRoomView" class="hidden max-w-lg mx-auto py-4 sm:py-8">
+            <div class="mb-4">
+                <button type="button" onclick="goHome()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-cream-200/80 hover:text-cream-50 hover:bg-evergreen-800/60 text-xs font-semibold transition-colors">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Back to Home</span>
+                </button>
+            </div>
+
+            <div class="cozy-card rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-evergreen-800/10">
+                    <div class="w-11 h-11 rounded-2xl bg-crimson-600 text-cream-50 flex items-center justify-center shrink-0 shadow-md">
+                        <i data-lucide="party-popper" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-2xl font-bold text-evergreen-900">Create a Room</h2>
+                        <p class="text-xs text-evergreen-800/70">Set up your group details and generate an invite code</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Group Name *</label>
+                        <input type="text" id="groupNameInput" maxlength="50" placeholder="e.g., Holiday Crew 2027"
+                            class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-medium">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Gift Budget</label>
+                            <input type="text" id="groupBudgetInput" maxlength="30" placeholder="e.g., $30 - $50"
+                                class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Exchange Date</label>
+                            <input type="date" id="groupDateInput"
+                                class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-medium">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Wishlist Deadline (Optional)</label>
+                        <input type="date" id="groupWishlistDeadlineInput"
+                            class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 focus:outline-none focus:ring-2 focus:ring-crimson-600 font-medium">
+                        <p class="text-[11px] text-evergreen-800/65 mt-1">Last day for friends to join and submit their wishlists.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Notes / Rules (Optional)</label>
+                        <input type="text" id="groupNotesInput" maxlength="120" placeholder="e.g., Handmade gifts welcome, wrapping required!"
+                            class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 text-sm">
+                    </div>
+
+                    <div class="pt-3 flex flex-col sm:flex-row gap-3">
+                        <button type="button" id="createGroupBtn" onclick="createRoomNow()"
+                            class="flex-1 py-3.5 px-5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold shadow-lg shadow-crimson-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99]">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span id="createGroupBtnLabel">Create & Open Room</span>
+                        </button>
+                        <button type="button" onclick="goHome()"
+                            class="py-3.5 px-5 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-semibold text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 1C: JOIN AN EXCHANGE PAGE -->
+        <div id="joinRoomView" class="hidden max-w-md mx-auto py-4 sm:py-8">
+            <div class="mb-4">
+                <button type="button" onclick="goHome()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-cream-200/80 hover:text-cream-50 hover:bg-evergreen-800/60 text-xs font-semibold transition-colors">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Back to Home</span>
+                </button>
+            </div>
+
+            <div class="cozy-card rounded-3xl p-6 sm:p-8 space-y-6">
+                <div class="flex items-center gap-3 pb-4 border-b border-evergreen-800/10">
+                    <div class="w-11 h-11 rounded-2xl bg-evergreen-900 text-gold-400 flex items-center justify-center shrink-0 shadow-md">
+                        <i data-lucide="key-round" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-2xl font-bold text-evergreen-900">Join an Exchange</h2>
+                        <p class="text-xs text-evergreen-800/70">Enter the 6-character room code shared by your host</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">Room Code *</label>
+                        <input type="text" id="joinCodeInput" maxlength="6" placeholder="XMAS27"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();joinRoomNow();}"
+                            class="w-full px-4 py-4 rounded-2xl bg-cream-100 border-2 border-evergreen-800/20 text-evergreen-950 placeholder-evergreen-800/35 focus:outline-none focus:border-crimson-600 font-mono text-2xl font-bold uppercase tracking-[0.28em] text-center">
+                    </div>
+
+                    <div class="pt-1 flex flex-col sm:flex-row gap-3">
+                        <button type="button" id="joinGroupBtn" onclick="joinRoomNow()"
+                            class="flex-1 py-3.5 px-5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold shadow-lg shadow-crimson-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99]">
+                            <span id="joinGroupBtnLabel">Enter Room</span>
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                        <button type="button" onclick="goHome()"
+                            class="py-3.5 px-5 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-semibold text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Rooms Quick-Join Section -->
+                <div id="recentRoomsSection" class="hidden pt-4 border-t border-evergreen-800/10">
+                    <p class="text-xs font-bold uppercase tracking-wider text-evergreen-800/70 mb-2.5 flex items-center gap-1.5">
+                        <i data-lucide="history" class="w-3.5 h-3.5"></i>
+                        <span>Recent Rooms</span>
+                    </p>
+                    <div id="recentRoomsList" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: GROUP ROOM DASHBOARD -->
+        <div id="roomView" class="hidden space-y-6">
+
+            <!-- Room Header Banner -->
+            <div class="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+                <div class="ribbon-stitch absolute inset-0 pointer-events-none opacity-40"></div>
+                <div class="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div class="space-y-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span id="roomStatusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                                <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                                Gathering Friends
+                            </span>
+                            <span id="hostCrownBadge" class="hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gold-500/25 text-gold-400 border border-gold-400/40">
+                                <i data-lucide="crown" class="w-3.5 h-3.5"></i>
+                                <span>Room Host</span>
+                            </span>
+                            <span id="roomBudgetBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-evergreen-950/70 text-cream-100 border border-cream-200/15">
+                                <i data-lucide="coins" class="w-3.5 h-3.5 text-gold-400"></i>
+                                <span id="displayBudget">No budget set</span>
+                            </span>
+                            <span id="roomDateBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-evergreen-950/70 text-cream-100 border border-cream-200/15">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-gold-400"></i>
+                                <span id="displayDate">Date TBD</span>
+                            </span>
+                            <span id="roomDeadlineBadge" class="hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-evergreen-950/70 text-cream-100 border border-cream-200/15">
+                                <i data-lucide="hourglass" class="w-3.5 h-3.5 text-gold-400"></i>
+                                <span id="displayWishlistDeadline"></span>
+                            </span>
+                        </div>
+
+                        <h2 id="displayGroupName" class="font-serif text-3xl sm:text-4xl font-bold text-cream-50 pt-1">Group Name</h2>
+                        <p id="displayGroupNotes" class="text-sm text-cream-200/80 max-w-2xl"></p>
+                    </div>
+
+                    <!-- Shareable Group Code Box -->
+                    <div class="bg-evergreen-950/90 border border-gold-400/35 rounded-2xl p-4 flex flex-col sm:flex-row lg:flex-col items-center justify-between gap-3 shrink-0 shadow-inner">
+                        <div class="text-center sm:text-left lg:text-center">
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-gold-400/80 block">Room Code</span>
+                            <span id="displayGroupCode" class="font-mono text-2xl sm:text-3xl font-extrabold tracking-widest text-cream-50 select-all">------</span>
+                        </div>
+                        <button type="button" onclick="copyInviteInfo()"
+                            class="w-full sm:w-auto lg:w-full px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-evergreen-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            <span>Copy Code</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Step Tabs / Navigation -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-evergreen-950/60 p-2 rounded-2xl border border-cream-200/10">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button type="button" onclick="switchRoomTab('participants')" id="tabParticipantsBtn"
+                        class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-cream-50 text-evergreen-950 shadow">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span>Friends & Draw</span>
+                        <span id="participantCountPill" class="px-2 py-0.5 rounded-full text-xs bg-crimson-600 text-white">0</span>
+                    </button>
+
+                    <button type="button" onclick="switchRoomTab('register')" id="tabRegisterBtn"
+                        class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all text-cream-200 hover:text-white hover:bg-evergreen-800/60">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        <span id="registerTabLabel">Add My Wishlist</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="refreshCurrentRoom()" title="Sync latest updates"
+                        class="px-3.5 py-2 rounded-xl bg-evergreen-800/70 hover:bg-evergreen-800 text-cream-100 text-xs font-semibold flex items-center gap-1.5 border border-cream-200/10 transition-colors">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-gold-400"></i>
+                        <span>Refresh</span>
+                    </button>
+                    <button type="button" id="headerDeleteRoomBtn" onclick="openDeleteRoomModal()" title="Delete Room (Host Only)"
+                        class="hidden px-3.5 py-2 rounded-xl bg-crimson-600/20 hover:bg-crimson-600/35 text-red-200 text-xs font-semibold flex items-center gap-1.5 border border-red-400/30 transition-colors">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Delete Room</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SUB-VIEW A: PARTICIPANTS LIST & DRAW / REVEAL CENTER -->
+            <div id="participantsTabContent" class="grid lg:grid-cols-3 gap-6 items-start">
+
+                <!-- Left 2 Columns: Friends List -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex items-center justify-between px-1">
+                        <h3 class="font-serif text-xl font-bold text-cream-50 flex items-center gap-2">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-gold-400"></i>
+                            <span>Registered Friends</span>
+                        </h3>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="emptyParticipantsState" class="glass-panel rounded-3xl p-8 sm:p-10 text-center space-y-4">
+                        <div class="w-14 h-14 rounded-2xl bg-gold-500/15 border border-gold-400/30 text-gold-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="gift" class="w-7 h-7"></i>
+                        </div>
+                        <div class="max-w-sm mx-auto">
+                            <h4 class="font-serif text-xl font-bold text-cream-50">No friends joined yet</h4>
+                            <p class="text-sm text-cream-200/75 mt-1">
+                                Tap <strong>"Add My Wishlist"</strong> to add your gift ideas to this room, or share code <strong id="emptyStateCode" class="text-gold-400 font-mono"></strong> with your friends!
+                            </p>
+                        </div>
+                        <div class="pt-2">
+                            <button type="button" onclick="switchRoomTab('register')"
+                                class="px-5 py-2.5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-sm inline-flex items-center gap-2 shadow-lg">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                                <span>Add My Wishlist</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Participants Grid -->
+                    <div id="participantsGrid" class="grid sm:grid-cols-2 gap-4"></div>
+                </div>
+
+                <!-- Right Column: Secret Santa Control & Reveal Box -->
+                <div class="space-y-4">
+                    <!-- Pre-Draw Control Card -->
+                    <div id="preDrawControlCard" class="cozy-card rounded-3xl p-6 space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center shrink-0">
+                                <i data-lucide="shuffle" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-serif text-lg font-bold text-evergreen-900">Secret Santa Hat</h3>
+                                <p class="text-xs text-evergreen-800/70">Minimum 3 friends required</p>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-evergreen-800/80 leading-relaxed">
+                            Once everyone has added their wishlist, draw names so each friend gets a secret recipient. Nobody can draw themselves!
+                        </p>
+
+                        <div class="bg-cream-100 rounded-2xl p-3.5 border border-evergreen-800/10 flex items-center justify-between">
+                            <span class="text-xs font-semibold text-evergreen-800">Participants Ready</span>
+                            <span id="drawProgressText" class="font-mono font-bold text-sm text-crimson-700">0 / 3 minimum</span>
+                        </div>
+
+                        <div id="hostDrawActionBox">
+                            <button type="button" onclick="triggerSecretSantaDraw()" id="drawNamesBtn" disabled
+                                class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-crimson-600 to-crimson-700 hover:from-crimson-700 hover:to-crimson-700 disabled:from-gray-300 disabled:to-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
+                                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                <span>Draw Names Now!</span>
+                            </button>
+                        </div>
+
+                        <div id="guestWaitingDrawBox" class="hidden space-y-2.5 text-center bg-cream-100 rounded-2xl p-4 border border-evergreen-800/10">
+                            <div class="inline-flex items-center gap-1.5 text-xs font-bold text-evergreen-900">
+                                <i data-lucide="clock" class="w-4 h-4 text-crimson-600"></i>
+                                <span>Waiting for Room Host to Draw</span>
+                            </div>
+                            <p class="text-xs text-evergreen-800/70">
+                                Only the host who created this room can start the draw.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Post-Draw Reveal Instructions Card -->
+                    <div id="postDrawControlCard" class="hidden cozy-card rounded-3xl p-6 space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-600/15 text-emerald-700 flex items-center justify-center shrink-0">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-serif text-lg font-bold text-evergreen-900">Names Are Drawn!</h3>
+                                <p class="text-xs text-evergreen-800/70">Secret matches are locked & ready</p>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-evergreen-800/80 leading-relaxed">
+                            Tap <strong>"Unwrap Match"</strong> on your card to privately see who you're gifting! You can also still edit your own wishlist anytime.
+                        </p>
+
+                        <div id="chatButtonsBox" class="hidden space-y-2 pt-1">
+                            <button type="button" onclick="openChat('santa')"
+                                class="w-full py-2.5 px-4 rounded-xl bg-evergreen-900 hover:bg-evergreen-800 text-cream-50 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors">
+                                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-gold-400"></i>
+                                <span>Message my recipient</span>
+                                <span id="chatBadge_santa" class="hidden px-1.5 py-0.5 rounded-full bg-crimson-600 text-white text-[10px] font-bold leading-none">NEW</span>
+                            </button>
+                            <button type="button" onclick="openChat('recipient')"
+                                class="w-full py-2.5 px-4 rounded-xl bg-cream-100 hover:bg-cream-200 text-evergreen-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-evergreen-800/10">
+                                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-crimson-600"></i>
+                                <span>Chat with my Secret Santa</span>
+                                <span id="chatBadge_recipient" class="hidden px-1.5 py-0.5 rounded-full bg-crimson-600 text-white text-[10px] font-bold leading-none">NEW</span>
+                            </button>
+                        </div>
+
+                        <div id="hostResetActionBox" class="pt-2 border-t border-evergreen-800/10 space-y-2">
+                            <button type="button" onclick="openResetConfirmModal()"
+                                class="w-full py-2.5 px-4 rounded-xl bg-cream-100 hover:bg-cream-200 text-evergreen-900 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                <span>Reset & Re-Draw Names</span>
+                            </button>
+                            <button type="button" onclick="openDeleteRoomModal()"
+                                class="w-full py-2.5 px-4 rounded-xl bg-crimson-600/10 hover:bg-crimson-600/20 text-crimson-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                <span>Delete Room</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-VIEW B: ADD / EDIT MY WISHLIST IN THIS ROOM -->
+            <div id="registerTabContent" class="hidden max-w-2xl mx-auto">
+                <div class="cozy-card rounded-3xl p-6 sm:p-8">
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b border-evergreen-800/10">
+                        <div>
+                            <h3 id="formModeTitle" class="font-serif text-2xl font-bold text-evergreen-900">My Wishlist for This Room</h3>
+                            <p id="formModeSubtitle" class="text-xs text-evergreen-800/70 mt-0.5">Signed in as <strong id="wishlistFormUserLabel"></strong></p>
+                        </div>
+                        <button type="button" onclick="switchRoomTab('participants')" class="text-xs font-semibold text-evergreen-800/70 hover:text-evergreen-950 flex items-center gap-1">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                            <span>Back</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-5">
+                        <input type="hidden" id="editingParticipantId" value="">
+                        <input type="hidden" id="partAvatarInput" value="reindeer">
+
+                        <!-- Animal Avatar Picker -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800">Animal Avatar</label>
+                                <span id="selectedAvatarLabel" class="text-xs font-semibold text-crimson-700">Reindeer</span>
+                            </div>
+                            <div id="avatarPickerGrid" class="grid grid-cols-4 sm:grid-cols-8 gap-2"></div>
+                        </div>
+
+                        <!-- Dynamic Wishlist Items Builder -->
+                        <div class="space-y-3 pt-1">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800">
+                                    Your Wishlist Ideas *
+                                </label>
+                                <button type="button" onclick="addWishlistItemInput()"
+                                    class="text-xs font-bold text-crimson-600 hover:text-crimson-700 flex items-center gap-1">
+                                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                                    <span>Add Another Item</span>
+                                </button>
+                            </div>
+
+                            <div id="wishlistInputsContainer" class="space-y-2.5"></div>
+                        </div>
+
+                        <!-- Extra Preferences -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800 mb-1.5">
+                                Helpful Hints (Sizes, Colors, Allergies, Dislikes)
+                            </label>
+                            <textarea id="partNotesInput" rows="2" maxlength="250" placeholder="e.g., Sweater size M, love dark chocolate & warm socks, no scented candles please!"
+                                class="w-full px-4 py-3 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 text-sm"></textarea>
+                        </div>
+
+                        <div class="pt-3 flex flex-col sm:flex-row gap-3">
+                            <button type="button" id="saveParticipantBtn" onclick="saveParticipantNow()"
+                                class="flex-1 py-3.5 px-5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold shadow-lg shadow-crimson-600/25 flex items-center justify-center gap-2 transition-all">
+                                <i data-lucide="check" class="w-4 h-4"></i>
+                                <span id="saveParticipantBtnText">Save My Wishlist</span>
+                            </button>
+                            <button type="button" onclick="resetParticipantForm(); switchRoomTab('participants');"
+                                class="py-3.5 px-5 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-semibold text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: VIEW PUBLIC WISHLIST -->
+    <div id="wishlistViewModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-5 relative">
+            <div class="flex items-center justify-between gap-3 pb-3 border-b border-evergreen-800/10">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div id="viewWishlistAvatar" class="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 overflow-hidden shadow-sm"></div>
+                    <div class="min-w-0">
+                        <h3 id="viewWishlistName" class="font-serif text-xl font-bold text-evergreen-950 truncate">Friend's Wishlist</h3>
+                        <p class="text-xs text-evergreen-800/70">Gift ideas & preferences</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('wishlistViewModal')" class="p-2 rounded-xl text-evergreen-800/60 hover:text-evergreen-950 hover:bg-cream-200/60">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="viewWishlistItems" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+
+            <div id="viewWishlistNotesBox" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs text-evergreen-900 space-y-1">
+                <span class="font-bold uppercase tracking-wider text-[10px] text-amber-800 block">Helpful Hints</span>
+                <p id="viewWishlistNotesText" class="leading-relaxed"></p>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-2">
+                <button type="button" id="editThisWishlistBtn" class="px-4 py-2.5 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-bold text-xs flex items-center gap-1.5">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                    <span>Edit My List</span>
+                </button>
+                <button type="button" onclick="closeModal('wishlistViewModal')" class="px-5 py-2.5 rounded-xl bg-evergreen-900 text-cream-50 font-bold text-xs">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: PIN VERIFICATION (FALLBACK IF NEEDED) -->
+    <div id="pinModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-sm w-full p-6 sm:p-7 space-y-5 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center mx-auto">
+                <i data-lucide="lock" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 id="pinModalTitle" class="font-serif text-2xl font-bold text-evergreen-950">Enter Your PIN</h3>
+                <p class="text-xs text-evergreen-800/75 mt-1">Verify identity for <strong id="pinTargetName" class="text-evergreen-950"></strong></p>
+            </div>
+
+            <div class="space-y-3">
+                <input type="password" id="verifyPinInput" maxlength="4" inputmode="numeric" placeholder="••••"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();verifyPinNow();}"
+                    class="w-full px-4 py-3.5 rounded-2xl bg-cream-100 border-2 border-evergreen-800/20 text-evergreen-950 text-center font-mono text-2xl tracking-[0.5em] focus:outline-none focus:border-crimson-600">
+                <p id="pinErrorMsg" class="hidden text-xs font-bold text-crimson-600">Incorrect PIN. Please try again.</p>
+            </div>
+
+            <div class="flex gap-2.5 pt-1">
+                <button type="button" onclick="closeModal('pinModal')" class="flex-1 py-3 rounded-xl bg-cream-200 text-evergreen-900 font-bold text-xs">
+                    Cancel
+                </button>
+                <button type="button" id="pinSubmitLabel" onclick="verifyPinNow()" class="flex-1 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs shadow-lg">
+                    Unlock
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PRIVATE SECRET SANTA REVEAL -->
+    <div id="revealModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/85 backdrop-blur-md">
+        <div class="max-w-md w-full">
+            <!-- Wrapped Gift Cover -->
+            <div id="wrappedCoverView" class="cozy-card rounded-3xl p-8 text-center space-y-6 border-2 border-gold-400">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-crimson-600 to-crimson-700 text-gold-400 flex items-center justify-center mx-auto shadow-xl animate-float">
+                    <i data-lucide="gift" class="w-8 h-8"></i>
+                </div>
+                <div class="space-y-2">
+                    <span class="text-[11px] font-bold uppercase tracking-widest text-crimson-700">Top Secret Assignment</span>
+                    <h3 class="font-serif text-2xl sm:text-3xl font-bold text-evergreen-950">
+                        Ready, <span id="revealSantaName" class="text-crimson-600">Friend</span>?
+                    </h3>
+                    <p class="text-xs text-evergreen-800/75">Make sure nobody is peeking over your shoulder!</p>
+                </div>
+                <button type="button" onclick="unwrapGiftCard()"
+                    class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-crimson-600 to-crimson-700 hover:from-crimson-700 hover:to-crimson-700 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-gold-400"></i>
+                    <span>Tap to Unwrap Your Match</span>
+                </button>
+                <button type="button" onclick="closeRevealModal()" class="text-xs font-semibold text-evergreen-800/60 hover:text-evergreen-950">
+                    Close
+                </button>
+            </div>
+
+            <!-- Unwrapped Recipient Details -->
+            <div id="unwrappedContentView" class="hidden cozy-card rounded-3xl p-6 sm:p-7 space-y-5 border-2 border-gold-400">
+                <div class="text-center space-y-1.5 pb-3 border-b border-evergreen-800/10">
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gold-500/20 text-evergreen-900 text-[11px] font-bold">
+                        <i data-lucide="sparkles" class="w-3 h-3 text-crimson-600"></i>
+                        <span>You Are Secret Santa For</span>
+                    </span>
+                    <h3 id="recipientNameDisplay" class="font-serif text-3xl font-bold text-crimson-600 pt-1">Recipient Name</h3>
+                    <div class="flex items-center justify-center gap-2 text-[11px] font-semibold text-evergreen-800/70">
+                        <span id="revealBudgetTag"></span>
+                        <span>•</span>
+                        <span id="revealDateTag"></span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-evergreen-800 block">Their Wishlist</span>
+                    <ul id="recipientWishlistDisplay" class="space-y-2 max-h-52 overflow-y-auto pr-1"></ul>
+                </div>
+
+                <div id="recipientNotesBox" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-evergreen-900 space-y-1">
+                    <span class="font-bold uppercase tracking-wider text-[10px] text-amber-800 block">Helpful Hints</span>
+                    <p id="recipientNotesText"></p>
+                </div>
+
+                <button type="button" onclick="closeRevealModal()"
+                    class="w-full py-3.5 rounded-xl bg-evergreen-900 hover:bg-evergreen-800 text-cream-50 font-bold text-sm">
+                    Got It, Hide Secret!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: RESET DRAW CONFIRMATION -->
+    <div id="resetConfirmModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+                <i data-lucide="rotate-ccw" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-serif text-xl font-bold text-evergreen-950">Reset Secret Santa Draw?</h3>
+                <p class="text-xs text-evergreen-800/75 mt-1">This will clear current matches so new friends can join or edit wishlists before drawing again.</p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button type="button" onclick="closeModal('resetConfirmModal')" class="flex-1 py-3 rounded-xl bg-cream-200 text-evergreen-900 font-bold text-xs">
+                    Keep Matches
+                </button>
+                <button type="button" onclick="confirmResetDraw()" class="flex-1 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs">
+                    Yes, Reset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: DELETE PARTICIPANT CONFIRMATION -->
+    <div id="deleteParticipantModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center mx-auto">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-serif text-xl font-bold text-evergreen-950">Remove Friend?</h3>
+                <p class="text-xs text-evergreen-800/75 mt-1">Are you sure you want to remove <strong id="deleteTargetName" class="text-evergreen-950"></strong> from this room?</p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button type="button" onclick="closeModal('deleteParticipantModal')" class="flex-1 py-3 rounded-xl bg-cream-200 text-evergreen-900 font-bold text-xs">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmDeleteParticipant()" class="flex-1 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs">
+                    Remove
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 6: DELETE ENTIRE ROOM CONFIRMATION (HOST ONLY) -->
+    <div id="deleteRoomModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center mx-auto">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-serif text-xl font-bold text-evergreen-950">Delete This Room?</h3>
+                <p class="text-xs text-evergreen-800/75 mt-1">
+                    This will permanently delete <strong id="deleteRoomTargetName" class="text-evergreen-950"></strong> and all wishlists for everyone. This cannot be undone.
+                </p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button type="button" onclick="closeModal('deleteRoomModal')" class="flex-1 py-3 rounded-xl bg-cream-200 text-evergreen-900 font-bold text-xs">
+                    Cancel
+                </button>
+                <button type="button" id="confirmDeleteRoomBtn" onclick="confirmDeleteRoom()" class="flex-1 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs">
+                    Delete Room
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 8: ANONYMOUS CHAT (SECRET SANTA <-> RECIPIENT) -->
+    <div id="chatModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-md w-full p-5 sm:p-6 space-y-4 relative">
+            <div class="flex items-start justify-between gap-3 pb-3 border-b border-evergreen-800/10">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-10 h-10 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center shrink-0">
+                        <i data-lucide="message-circle" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 id="chatTitle" class="font-serif text-lg font-bold text-evergreen-950 truncate">Chat</h3>
+                        <p id="chatSubtitle" class="text-[11px] text-evergreen-800/70 leading-snug"></p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeChat()" class="p-2 rounded-xl text-evergreen-800/60 hover:text-evergreen-950 hover:bg-cream-200/60 shrink-0">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="chatMessages" class="space-y-2 h-72 overflow-y-auto pr-1 flex flex-col"></div>
+
+            <div class="flex items-end gap-2">
+                <textarea id="chatInput" rows="2" maxlength="500" placeholder="Write a message..."
+                    onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendChatMessage();}"
+                    class="flex-1 px-3.5 py-2.5 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 text-sm resize-none"></textarea>
+                <button type="button" id="chatSendBtn" onclick="sendChatMessage()" title="Send"
+                    class="p-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 disabled:opacity-50 text-white shrink-0 transition-colors">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 7: NOTIFICATIONS CENTER -->
+    <div id="notificationsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-5 relative">
+            <div class="flex items-center justify-between gap-3 pb-3 border-b border-evergreen-800/10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center shrink-0">
+                        <i data-lucide="bell" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-serif text-xl font-bold text-evergreen-950">Notifications</h3>
+                        <p class="text-xs text-evergreen-800/70">Updates about your gift recipient & rooms</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('notificationsModal')" class="p-2 rounded-xl text-evergreen-800/60 hover:text-evergreen-950 hover:bg-cream-200/60">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Telegram -->
+            <div id="tgBlock" class="p-3 rounded-2xl bg-cream-100 border border-evergreen-800/10">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="text-xs text-evergreen-900">
+                        <span class="font-bold block">Уведомления в Telegram</span>
+                        <span id="tgStatusText" class="text-[11px] text-evergreen-800/70">Проверяю…</span>
+                    </div>
+                    <a id="tgConnectLink" href="#" target="_blank" rel="noopener"
+                        class="hidden px-3 py-1.5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-[11px] shrink-0 transition-colors">
+                        Подключить
+                    </a>
+                    <button type="button" id="tgUnlinkBtn" onclick="unlinkTelegram()"
+                        class="hidden px-3 py-1.5 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-bold text-[11px] shrink-0">
+                        Отключить
+                    </button>
+                </div>
+            </div>
+
+            <!-- Browser Push Permission Bar -->
+            <div class="flex items-center justify-between gap-2 p-3 rounded-2xl bg-cream-100 border border-evergreen-800/10">
+                <div class="text-xs text-evergreen-900">
+                    <span class="font-bold block">Device Alert Popups</span>
+                    <span id="browserNotifStatusText" class="text-[11px] text-evergreen-800/70">Get notified when your recipient updates their list</span>
+                </div>
+                <button type="button" id="enableBrowserNotifBtn" onclick="requestBrowserNotifications()"
+                    class="px-3 py-1.5 rounded-xl bg-evergreen-900 hover:bg-evergreen-800 text-cream-50 font-bold text-[11px] shrink-0 transition-colors">
+                    Enable
+                </button>
+            </div>
+
+            <!-- Notifications List -->
+            <div id="notificationsListContainer" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-evergreen-800/10">
+                <button type="button" onclick="clearAllNotifications()" class="px-3.5 py-2 rounded-xl bg-cream-200 hover:bg-cream-200/80 text-evergreen-900 font-bold text-xs">
+                    Clear All
+                </button>
+                <button type="button" onclick="closeModal('notificationsModal')" class="px-5 py-2 rounded-xl bg-evergreen-900 text-cream-50 font-bold text-xs">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- GLOBAL ACCOUNT AUTH (NAME + PIN) + CROSS-DEVICE CLOUD SYNC            -->
+    <!-- ===================================================================== -->
+    <script>
+        (function() {
+            var currentUser = null; // { id, name, pin, avatar, rooms: [{code, name}] }
+            var authMode = 'create';
+            var currentGroupId = null;
+            var currentGroupData = null;
+            var pendingPinAction = null;
+            var pendingDeleteParticipantId = null;
+            var memoryRooms = {};
+            var memoryUsers = {};
+            var syncTimer = null;
+            var globalNotifTimer = null;
+
+            var FIRESTORE_DOC_BASE = "https://firestore.googleapis.com/v1/projects/secret-santa-2027-41bb1/databases/(default)/documents/secret_santa_rooms/";
+            var FIRESTORE_USER_BASE = "https://firestore.googleapis.com/v1/projects/secret-santa-2027-41bb1/databases/(default)/documents/secret_santa_users/";
+            var FIRESTORE_CHAT_BASE = "https://firestore.googleapis.com/v1/projects/secret-santa-2027-41bb1/databases/(default)/documents/secret_santa_chats/";
+            var NTFY_TOPIC_PREFIX = "https://ntfy.sh/ss2027_exchange_";
+            var NTFY_USER_PREFIX = "https://ntfy.sh/ss2027_user_";
+
+            // ===== TELEGRAM SETTINGS: FILL IN THESE TWO LINES =====
+            var SCRIPT_URL = "PASTE_SCRIPT_URL_HERE";     // Apps Script web app URL, ends with /exec
+            var BOT_USERNAME = "PASTE_BOT_USERNAME_HERE"; // bot username WITHOUT the @
+            var tgPollTimer = null;
+
+            // Built-in SVG icon library (works 100% offline & in Google Sites)
+            var SVG_ICONS = {
+                'gift': '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>',
+                'sparkles': '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
+                'party-popper': '<path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/>',
+                'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+                'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+                'key-round': '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+                'history': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+                'crown': '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>',
+                'coins': '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
+                'calendar': '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+                'hourglass': '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+                'copy': '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+                'users': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+                'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+                'refresh-cw': '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+                'plus': '<path d="M5 12h14"/><path d="M12 5v14"/>',
+                'plus-circle': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>',
+                'shuffle': '<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/>',
+                'clock': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+                'check-circle-2': '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+                'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+                'check': '<path d="M20 6 9 17l-5-5"/>',
+                'x': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+                'pencil': '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+                'lock': '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+                'trash-2': '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+                'heart': '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+                'alert-circle': '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+                'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+                'bell': '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+                'message-circle': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+                'send': '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>'
+            };
+
+            function renderAllIcons() {
+                var nodes = document.querySelectorAll('i[data-lucide]');
+                for (var i = 0; i < nodes.length; i++) {
+                    var el = nodes[i];
+                    var name = el.getAttribute('data-lucide');
+                    var paths = SVG_ICONS[name];
+                    if (paths) {
+                        var cls = el.getAttribute('class') || 'w-4 h-4';
+                        el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="' + cls + '">' + paths + '</svg>';
+                        el.style.display = 'inline-flex';
+                        el.style.alignItems = 'center';
+                        el.style.justifyContent = 'center';
+                    }
+                }
+            }
+
+            // Cute Cozy Animal Avatars
+            var ANIMAL_AVATARS = [
+                {
+                    id: 'reindeer',
+                    label: 'Reindeer',
+                    bg: 'bg-amber-100 border-amber-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><path d="M22 18 L16 6 M19 11 L13 10 M21 15 L25 9 M42 18 L48 6 M45 11 L51 10 M43 15 L39 9" stroke="#78350F" stroke-width="3" stroke-linecap="round"/><ellipse cx="15" cy="24" rx="6" ry="3.5" transform="rotate(-20 15 24)" fill="#B45309"/><ellipse cx="49" cy="24" rx="6" ry="3.5" transform="rotate(20 49 24)" fill="#B45309"/><circle cx="32" cy="36" r="18" fill="#D97706"/><ellipse cx="32" cy="42" rx="11" ry="8" fill="#FDE68A"/><circle cx="25" cy="32" r="2.5" fill="#1F2937"/><circle cx="39" cy="32" r="2.5" fill="#1F2937"/><circle cx="32" cy="39" r="4.2" fill="#DC2626"/><circle cx="30.8" cy="37.8" r="1.2" fill="#FCA5A5"/></svg>'
+                },
+                {
+                    id: 'penguin',
+                    label: 'Penguin',
+                    bg: 'bg-sky-100 border-sky-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><circle cx="32" cy="35" r="19" fill="#1E293B"/><path d="M20 36 C20 24, 32 25, 32 30 C32 25, 44 24, 44 36 C44 47, 38 52, 32 52 C26 52, 20 47, 20 36 Z" fill="#F8FAFC"/><circle cx="26" cy="32" r="2.4" fill="#0F172A"/><circle cx="38" cy="32" r="2.4" fill="#0F172A"/><polygon points="28,37 36,37 32,42" fill="#F59E0B"/><path d="M18 46 Q32 51 46 46" stroke="#DC2626" stroke-width="4" stroke-linecap="round" fill="none"/></svg>'
+                },
+                {
+                    id: 'fox',
+                    label: 'Arctic Fox',
+                    bg: 'bg-orange-100 border-orange-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><polygon points="15,28 19,10 30,22" fill="#EA580C"/><polygon points="49,28 45,10 34,22" fill="#EA580C"/><circle cx="32" cy="36" r="18" fill="#F97316"/><path d="M14 36 Q23 36 32 45 Q41 36 50 36 Q47 52 32 53 Q17 52 14 36 Z" fill="#FFF7ED"/><circle cx="25" cy="33" r="2.4" fill="#1F2937"/><circle cx="39" cy="33" r="2.4" fill="#1F2937"/><circle cx="32" cy="43" r="3" fill="#1F2937"/></svg>'
+                },
+                {
+                    id: 'bear',
+                    label: 'Polar Bear',
+                    bg: 'bg-indigo-100 border-indigo-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><circle cx="18" cy="19" r="6.5" fill="#E2E8F0"/><circle cx="46" cy="19" r="6.5" fill="#E2E8F0"/><circle cx="32" cy="36" r="19" fill="#F8FAFC"/><ellipse cx="32" cy="42" rx="9" ry="7" fill="#E2E8F0"/><circle cx="25" cy="32" r="2.4" fill="#1E293B"/><circle cx="39" cy="32" r="2.4" fill="#1E293B"/><ellipse cx="32" cy="39" rx="3.8" ry="2.6" fill="#1E293B"/></svg>'
+                },
+                {
+                    id: 'owl',
+                    label: 'Snow Owl',
+                    bg: 'bg-purple-100 border-purple-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><circle cx="32" cy="35" r="19" fill="#94A3B8"/><circle cx="25" cy="33" r="7.5" fill="#F8FAFC"/><circle cx="39" cy="33" r="7.5" fill="#F8FAFC"/><circle cx="25" cy="33" r="3" fill="#0F172A"/><circle cx="39" cy="33" r="3" fill="#0F172A"/><polygon points="29,38 35,38 32,44" fill="#F59E0B"/></svg>'
+                },
+                {
+                    id: 'bunny',
+                    label: 'Snow Bunny',
+                    bg: 'bg-rose-100 border-rose-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><ellipse cx="24" cy="16" rx="4.5" ry="12" fill="#F1F5F9"/><ellipse cx="40" cy="16" rx="4.5" ry="12" fill="#F1F5F9"/><ellipse cx="24" cy="16" rx="2.2" ry="8" fill="#FDA4AF"/><ellipse cx="40" cy="16" rx="2.2" ry="8" fill="#FDA4AF"/><circle cx="32" cy="38" r="17" fill="#F8FAFC"/><circle cx="26" cy="35" r="2.3" fill="#1E293B"/><circle cx="38" cy="35" r="2.3" fill="#1E293B"/><circle cx="32" cy="41" r="2.5" fill="#FB7185"/></svg>'
+                },
+                {
+                    id: 'cat',
+                    label: 'Ginger Cat',
+                    bg: 'bg-yellow-100 border-yellow-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><polygon points="15,28 18,11 29,22" fill="#F59E0B"/><polygon points="49,28 46,11 35,22" fill="#F59E0B"/><circle cx="32" cy="37" r="18" fill="#FBBF24"/><circle cx="25" cy="34" r="2.4" fill="#1F2937"/><circle cx="39" cy="34" r="2.4" fill="#1F2937"/><polygon points="29,39 35,39 32,42" fill="#F43F5E"/><path d="M12 37 L20 38 M12 41 L20 40 M52 37 L44 38 M52 41 L44 40" stroke="#92400E" stroke-width="1.6" stroke-linecap="round"/></svg>'
+                },
+                {
+                    id: 'dog',
+                    label: 'Cozy Pup',
+                    bg: 'bg-emerald-100 border-emerald-300',
+                    svg: '<svg viewBox="0 0 64 64" class="w-full h-full"><ellipse cx="15" cy="33" rx="5.5" ry="11" transform="rotate(15 15 33)" fill="#78350F"/><ellipse cx="49" cy="33" rx="5.5" ry="11" transform="rotate(-15 49 33)" fill="#78350F"/><circle cx="32" cy="36" r="18" fill="#B45309"/><ellipse cx="32" cy="42" rx="9.5" ry="7.5" fill="#FDE68A"/><circle cx="25" cy="32" r="2.4" fill="#1F2937"/><circle cx="39" cy="32" r="2.4" fill="#1F2937"/><ellipse cx="32" cy="39" rx="3.6" ry="2.6" fill="#1F2937"/></svg>'
+                }
+            ];
+
+            function getAvatarData(avatarId, fallbackName) {
+                for (var i = 0; i < ANIMAL_AVATARS.length; i++) {
+                    if (ANIMAL_AVATARS[i].id === avatarId) return ANIMAL_AVATARS[i];
+                }
+                var idx = 0;
+                var str = String(fallbackName || 'A');
+                for (var j = 0; j < str.length; j++) idx += str.charCodeAt(j);
+                return ANIMAL_AVATARS[idx % ANIMAL_AVATARS.length];
+            }
+
+            function renderAvatarBadge(avatarId, sizeClass, fallbackName) {
+                var av = getAvatarData(avatarId, fallbackName);
+                return '<div class="' + (sizeClass || 'w-12 h-12') + ' rounded-2xl ' + av.bg + ' border flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1">' + av.svg + '</div>';
+            }
+
+            function initAuthAvatarPicker(selectedId) {
+                var activeId = selectedId || 'reindeer';
+                var hiddenInput = document.getElementById('authAvatarInput');
+                var labelEl = document.getElementById('authSelectedAvatarLabel');
+                var grid = document.getElementById('authAvatarPickerGrid');
+                if (hiddenInput) hiddenInput.value = activeId;
+                if (!grid) return;
+
+                grid.innerHTML = ANIMAL_AVATARS.map(function(av) {
+                    var isSel = av.id === activeId;
+                    if (isSel && labelEl) labelEl.textContent = av.label;
+                    return '<button type="button" onclick="selectAuthAvatar(\'' + av.id + '\')" title="' + av.label + '" class="p-1.5 rounded-2xl border-2 transition-all flex items-center justify-center ' + av.bg + ' ' + (isSel ? 'ring-2 ring-crimson-600 border-crimson-600 scale-105 shadow-md' : 'opacity-80 hover:opacity-100') + '">' +
+                        '<div class="w-8 h-8">' + av.svg + '</div>' +
+                    '</button>';
+                }).join('');
+            }
+
+            window.selectAuthAvatar = function(avatarId) {
+                initAuthAvatarPicker(avatarId);
+            };
+
+            function initAvatarPicker(selectedId) {
+                var activeId = selectedId || (currentUser ? currentUser.avatar : 'reindeer');
+                var hiddenInput = document.getElementById('partAvatarInput');
+                var labelEl = document.getElementById('selectedAvatarLabel');
+                var grid = document.getElementById('avatarPickerGrid');
+                if (hiddenInput) hiddenInput.value = activeId;
+                if (!grid) return;
+
+                grid.innerHTML = ANIMAL_AVATARS.map(function(av) {
+                    var isSel = av.id === activeId;
+                    if (isSel && labelEl) labelEl.textContent = av.label;
+                    return '<button type="button" onclick="selectAnimalAvatar(\'' + av.id + '\')" title="' + av.label + '" class="p-1.5 rounded-2xl border-2 transition-all flex items-center justify-center ' + av.bg + ' ' + (isSel ? 'ring-2 ring-crimson-600 border-crimson-600 scale-105 shadow-md' : 'opacity-80 hover:opacity-100') + '">' +
+                        '<div class="w-9 h-9">' + av.svg + '</div>' +
+                    '</button>';
+                }).join('');
+            }
+
+            window.selectAnimalAvatar = function(avatarId) {
+                initAvatarPicker(avatarId);
+            };
+
+            function escapeHtml(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            // Multi-layer Safe Storage Helpers (survives Google Sites iframe reloads!)
+            function readWindowNameState() {
+                try {
+                    if (window.name && window.name.indexOf('SS2027_STATE:') === 0) {
+                        return JSON.parse(window.name.substring('SS2027_STATE:'.length));
+                    }
+                } catch (e) {}
+                return {};
+            }
+
+            function writeWindowNameState(obj) {
+                try {
+                    window.name = 'SS2027_STATE:' + JSON.stringify(obj);
+                } catch (e) {}
+            }
+
+            function getStore(key) {
+                var val = null;
+                try { val = localStorage.getItem(key); } catch (e) {}
+                if (val !== null && val !== undefined) return val;
+                try { val = sessionStorage.getItem(key); } catch (e) {}
+                if (val !== null && val !== undefined) return val;
+                var wn = readWindowNameState();
+                return wn[key] !== undefined ? wn[key] : null;
+            }
+
+            function setStore(key, val) {
+                try { localStorage.setItem(key, val); } catch (e) {}
+                try { sessionStorage.setItem(key, val); } catch (e) {}
+                var wn = readWindowNameState();
+                wn[key] = val;
+                writeWindowNameState(wn);
+            }
+
+            function removeStore(key) {
+                try { localStorage.removeItem(key); } catch (e) {}
+                try { sessionStorage.removeItem(key); } catch (e) {}
+                var wn = readWindowNameState();
+                delete wn[key];
+                writeWindowNameState(wn);
+            }
+
+            // =================================================================
+            // GLOBAL USER ACCOUNT SYNC (NAME + 4-DIGIT PIN)
+            // =================================================================
+            function normalizeUserKey(name) {
+                // Unicode-aware: Cyrillic / Kazakh names no longer collapse into the same key
+                return String(name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '_');
+            }
+
+            function encodeFirestoreFields(obj) {
+                return {
+                    fields: {
+                        payload: { stringValue: JSON.stringify(obj) },
+                        updatedAt: { integerValue: String(Date.now()) }
+                    }
+                };
+            }
+
+            function decodeFirestoreDoc(docJson) {
+                if (!docJson || !docJson.fields || !docJson.fields.payload) return null;
+                try {
+                    return JSON.parse(docJson.fields.payload.stringValue);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function syncSaveUser(userObj) {
+                var key = normalizeUserKey(userObj.name);
+                userObj.updatedAt = Date.now();
+                memoryUsers[key] = userObj;
+                setStore('ss2027_user_doc_' + key, JSON.stringify(userObj));
+                setStore('ss2027_current_user', JSON.stringify(userObj));
+
+                var fsReq = fetch(FIRESTORE_USER_BASE + encodeURIComponent(key), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(encodeFirestoreFields(userObj))
+                }).catch(function() { return null; });
+
+                var ntfyReq = fetch(NTFY_USER_PREFIX + encodeURIComponent(key), {
+                    method: "POST",
+                    body: JSON.stringify(userObj)
+                }).catch(function() { return null; });
+
+                return Promise.all([fsReq, ntfyReq]);
+            }
+
+            function syncFetchUser(name) {
+                var key = normalizeUserKey(name);
+                if (!key) return Promise.resolve(null);
+
+                var localUser = memoryUsers[key] || null;
+                if (!localUser) {
+                    var rawLocal = getStore('ss2027_user_doc_' + key);
+                    if (rawLocal) {
+                        try { localUser = JSON.parse(rawLocal); } catch (e) {}
+                    }
+                }
+
+                var fsFetch = fetch(FIRESTORE_USER_BASE + encodeURIComponent(key) + "?t=" + Date.now(), {
+                    method: "GET"
+                }).then(function(res) {
+                    if (!res.ok) return null;
+                    return res.json().then(decodeFirestoreDoc);
+                }).catch(function() { return null; });
+
+                var ntfyFetch = fetch(NTFY_USER_PREFIX + encodeURIComponent(key) + "/json?poll=1&since=all", {
+                    method: "GET"
+                }).then(function(res) {
+                    if (!res.ok) return null;
+                    return res.text().then(function(txt) {
+                        if (!txt) return null;
+                        var lines = txt.trim().split('\n');
+                        for (var i = lines.length - 1; i >= 0; i--) {
+                            try {
+                                var evt = JSON.parse(lines[i]);
+                                if (evt && evt.message) {
+                                    var candidate = JSON.parse(evt.message);
+                                    if (candidate && normalizeUserKey(candidate.name) === key) {
+                                        return candidate;
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        return null;
+                    });
+                }).catch(function() { return null; });
+
+                return Promise.all([fsFetch, ntfyFetch]).then(function(results) {
+                    var candidates = [results[0], results[1], localUser].filter(Boolean);
+                    if (candidates.length === 0) return null;
+                    candidates.sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+                    var best = candidates[0];
+                    memoryUsers[key] = best;
+                    setStore('ss2027_user_doc_' + key, JSON.stringify(best));
+                    return best;
+                });
+            }
+
+            window.switchAuthTab = function(mode) {
+                authMode = mode === 'login' ? 'login' : 'create';
+                var createBtn = document.getElementById('authTabCreateBtn');
+                var loginBtn = document.getElementById('authTabLoginBtn');
+                var avatarWrap = document.getElementById('authAvatarWrapper');
+                var helper = document.getElementById('authPinHelperText');
+                var submitLabel = document.getElementById('authSubmitBtnLabel');
+
+                if (authMode === 'create') {
+                    createBtn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-crimson-600 text-white shadow transition-all';
+                    loginBtn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-evergreen-900 hover:bg-cream-100 transition-all';
+                    avatarWrap.classList.remove('hidden');
+                    helper.textContent = "Choose a 4-digit PIN you'll remember—you'll use it to log in on any device.";
+                    submitLabel.textContent = 'Create Profile & Continue';
+                } else {
+                    loginBtn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-crimson-600 text-white shadow transition-all';
+                    createBtn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-evergreen-900 hover:bg-cream-100 transition-all';
+                    avatarWrap.classList.add('hidden');
+                    helper.textContent = 'Enter the 4-digit PIN you set when creating your profile.';
+                    submitLabel.textContent = 'Log In & Continue';
+                }
+            };
+
+            window.submitAuthForm = function() {
+                var nameInput = document.getElementById('authNameInput');
+                var pinInput = document.getElementById('authPinInput');
+                var avatarInput = document.getElementById('authAvatarInput');
+
+                var name = nameInput ? nameInput.value.trim() : '';
+                var pin = pinInput ? pinInput.value.trim() : '';
+                var avatar = avatarInput ? avatarInput.value : 'reindeer';
+
+                if (!name) {
+                    showToast('Please enter your Name or Nickname.', 'error');
+                    if (nameInput) nameInput.focus();
+                    return;
+                }
+                if (!/^\d{4}$/.test(pin)) {
+                    showToast('Please enter a 4-digit PIN code.', 'error');
+                    if (pinInput) pinInput.focus();
+                    return;
+                }
+
+                var btn = document.getElementById('authSubmitBtn');
+                var btnLabel = document.getElementById('authSubmitBtnLabel');
+                if (btn) btn.disabled = true;
+                if (btnLabel) btnLabel.textContent = authMode === 'create' ? 'Creating Profile...' : 'Signing In...';
+
+                syncFetchUser(name).then(function(existingUser) {
+                    if (authMode === 'create') {
+                        if (existingUser) {
+                            if (existingUser.pin === pin) {
+                                // Same name + matching PIN -> log them straight in!
+                                completeUserSignIn(existingUser);
+                                showToast('Welcome back, ' + existingUser.name + '!', 'success');
+                                return;
+                            }
+                            if (btn) btn.disabled = false;
+                            if (btnLabel) btnLabel.textContent = 'Create Profile & Continue';
+                            showToast('That name is already registered. Switch to "Log In" or choose a slightly different name.', 'error');
+                            return;
+                        }
+
+                        var newUser = {
+                            id: 'u_' + normalizeUserKey(name) + '_' + Date.now().toString(36),
+                            name: name,
+                            pin: pin,
+                            avatar: avatar || 'reindeer',
+                            rooms: [],
+                            updatedAt: Date.now()
+                        };
+                        return syncSaveUser(newUser).then(function() {
+                            completeUserSignIn(newUser);
+                            showToast('Profile created! Welcome, ' + newUser.name + '!', 'success');
+                            // Offer to connect Telegram right after registration
+                            setTimeout(function() { window.openNotificationsModal(); }, 700);
+                        });
+                    } else {
+                        if (!existingUser) {
+                            if (btn) btn.disabled = false;
+                            if (btnLabel) btnLabel.textContent = 'Log In & Continue';
+                            showToast('No profile found for "' + name + '". Tap "Create Profile" first!', 'error');
+                            return;
+                        }
+                        if (existingUser.pin !== pin) {
+                            if (btn) btn.disabled = false;
+                            if (btnLabel) btnLabel.textContent = 'Log In & Continue';
+                            showToast('Incorrect 4-digit PIN for ' + existingUser.name + '.', 'error');
+                            return;
+                        }
+                        completeUserSignIn(existingUser);
+                        showToast('Welcome back, ' + existingUser.name + '!', 'success');
+                    }
+                });
+            };
+
+            function completeUserSignIn(userObj) {
+                currentUser = userObj;
+                setStore('ss2027_current_user', JSON.stringify(userObj));
+
+                var btn = document.getElementById('authSubmitBtn');
+                var btnLabel = document.getElementById('authSubmitBtnLabel');
+                if (btn) btn.disabled = false;
+                if (btnLabel) btnLabel.textContent = authMode === 'create' ? 'Create Profile & Continue' : 'Log In & Continue';
+
+                updateHeaderUserUI();
+                startGlobalNotificationWatcher();
+
+                // Restore active room if any, otherwise open landing dashboard
+                var urlParams = new URLSearchParams(window.location.search);
+                var roomParam = urlParams.get('room');
+                var savedActiveRoom = getStore('ss2027_active_room');
+                var initialRoomCode = roomParam || savedActiveRoom;
+                if (initialRoomCode) {
+                    var cachedRoom = getRoomLocally(initialRoomCode);
+                    if (cachedRoom) {
+                        openRoom(initialRoomCode, cachedRoom);
+                    }
+                    window.joinGroupByCode(initialRoomCode);
+                } else {
+                    showView('landingView');
+                }
+            }
+
+            window.logoutUser = function() {
+                if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+                if (chatUnreadTimer) { clearInterval(chatUnreadTimer); chatUnreadTimer = null; }
+                if (globalNotifTimer) { clearInterval(globalNotifTimer); globalNotifTimer = null; }
+                currentUser = null;
+                currentGroupId = null;
+                currentGroupData = null;
+                removeStore('ss2027_current_user');
+                removeStore('ss2027_active_room');
+                updateHeaderUserUI();
+                document.getElementById('authPinInput').value = '';
+                window.switchAuthTab('login');
+                showView('authView');
+                showToast('Signed out.', 'info');
+            };
+
+            function updateHeaderUserUI() {
+                var badge = document.getElementById('headerUserBadge');
+                var notifBtn = document.getElementById('headerNotifBtn');
+                var avatarBox = document.getElementById('headerUserAvatar');
+                var nameSpan = document.getElementById('headerUserName');
+                var welcomeSpan = document.getElementById('landingWelcomeName');
+
+                if (!currentUser) {
+                    if (badge) { badge.classList.add('hidden'); badge.classList.remove('flex'); }
+                    if (notifBtn) { notifBtn.classList.add('hidden'); }
+                    return;
+                }
+
+                var av = getAvatarData(currentUser.avatar, currentUser.name);
+                if (avatarBox) avatarBox.innerHTML = av.svg;
+                if (nameSpan) nameSpan.textContent = currentUser.name;
+                if (welcomeSpan) welcomeSpan.textContent = currentUser.name;
+                if (badge) { badge.classList.remove('hidden'); badge.classList.add('flex'); }
+                if (notifBtn) { notifBtn.classList.remove('hidden'); }
+                updateNotificationBadge();
+            }
+
+            // =================================================================
+            // RECIPIENT WISHLIST & ROOM NOTIFICATIONS ENGINE
+            // =================================================================
+            function getUserNotifStoreKey() {
+                return currentUser ? 'ss2027_notifs_' + normalizeUserKey(currentUser.name) : null;
+            }
+
+            function getUserSnapshotStoreKey() {
+                return currentUser ? 'ss2027_recipient_snaps_' + normalizeUserKey(currentUser.name) : null;
+            }
+
+            function getNotificationsList() {
+                var key = getUserNotifStoreKey();
+                if (!key) return [];
+                var raw = getStore(key);
+                if (raw) {
+                    try {
+                        var parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) return parsed;
+                    } catch (e) {}
+                }
+                return [];
+            }
+
+            function saveNotificationsList(list) {
+                var key = getUserNotifStoreKey();
+                if (!key) return;
+                setStore(key, JSON.stringify(list.slice(0, 30)));
+                updateNotificationBadge();
+            }
+
+            function getRecipientSnapshots() {
+                var key = getUserSnapshotStoreKey();
+                if (!key) return {};
+                var raw = getStore(key);
+                if (raw) {
+                    try {
+                        var parsed = JSON.parse(raw);
+                        if (parsed && typeof parsed === 'object') return parsed;
+                    } catch (e) {}
+                }
+                return {};
+            }
+
+            function saveRecipientSnapshots(snaps) {
+                var key = getUserSnapshotStoreKey();
+                if (!key) return;
+                setStore(key, JSON.stringify(snaps));
+            }
+
+            function pushUserNotification(notifObj) {
+                if (!currentUser) return;
+                var list = getNotificationsList();
+                // Avoid duplicate notification with same signature
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].sig && list[i].sig === notifObj.sig) return;
+                }
+                notifObj.id = 'n_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+                notifObj.timestamp = Date.now();
+                notifObj.read = false;
+                list.unshift(notifObj);
+                saveNotificationsList(list);
+
+                showToast(notifObj.title + ': ' + notifObj.body, 'info');
+                sendBrowserSystemNotification(notifObj.title, notifObj.body);
+            }
+
+            function evaluateRoomUpdatesForRecipient(roomData) {
+                if (!currentUser || !roomData || !roomData.code) return;
+                var participants = Array.isArray(roomData.participants) ? roomData.participants : [];
+                var myEntry = null;
+                for (var i = 0; i < participants.length; i++) {
+                    if (isCurrentParticipantOwner(participants[i])) {
+                        myEntry = participants[i];
+                        break;
+                    }
+                }
+                if (!myEntry) return;
+
+                var snaps = getRecipientSnapshots();
+                var roomKey = roomData.code.toUpperCase();
+                var prevSnap = snaps[roomKey] || null;
+                var isDrawn = roomData.status === 'drawn' && roomData.assignments;
+
+                if (!isDrawn) {
+                    snaps[roomKey] = { status: 'open' };
+                    saveRecipientSnapshots(snaps);
+                    return;
+                }
+
+                var recipientId = roomData.assignments[myEntry.id];
+                var recipient = null;
+                for (var j = 0; j < participants.length; j++) {
+                    if (participants[j].id === recipientId) {
+                        recipient = participants[j];
+                        break;
+                    }
+                }
+                if (!recipient) return;
+
+                var currentWishlistSig = JSON.stringify({
+                    w: recipient.wishlist || [],
+                    n: recipient.notes || ''
+                });
+
+                if (!prevSnap || prevSnap.status !== 'drawn' || prevSnap.recipientId !== recipient.id) {
+                    // Newly drawn or reassigned!
+                    snaps[roomKey] = {
+                        status: 'drawn',
+                        recipientId: recipient.id,
+                        recipientName: recipient.name,
+                        wishlistSig: currentWishlistSig
+                    };
+                    saveRecipientSnapshots(snaps);
+
+                    pushUserNotification({
+                        sig: 'drawn_' + roomKey + '_' + recipient.id,
+                        roomCode: roomKey,
+                        roomName: roomData.name || roomKey,
+                        title: 'Names Drawn in ' + (roomData.name || roomKey) + '!',
+                        body: 'Your Secret Santa match is ready to unwrap.'
+                    });
+                } else if (prevSnap.wishlistSig && prevSnap.wishlistSig !== currentWishlistSig) {
+                    // Our gift recipient updated their wishlist or helpful hints!
+                    snaps[roomKey] = {
+                        status: 'drawn',
+                        recipientId: recipient.id,
+                        recipientName: recipient.name,
+                        wishlistSig: currentWishlistSig
+                    };
+                    saveRecipientSnapshots(snaps);
+
+                    pushUserNotification({
+                        sig: 'wish_' + roomKey + '_' + recipient.id + '_' + Date.now(),
+                        roomCode: roomKey,
+                        roomName: roomData.name || roomKey,
+                        title: recipient.name + ' updated their wishlist!',
+                        body: 'Check their new gift ideas in "' + (roomData.name || roomKey) + '".'
+                    });
+                }
+            }
+
+            function updateNotificationBadge() {
+                var badge = document.getElementById('notifUnreadBadge');
+                if (!badge) return;
+                var list = getNotificationsList();
+                var unreadCount = 0;
+                for (var i = 0; i < list.length; i++) {
+                    if (!list[i].read) unreadCount++;
+                }
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+
+            window.openNotificationsModal = function() {
+                if (!requireSignedInUser()) return;
+                var list = getNotificationsList();
+                // Mark all as read upon opening
+                for (var i = 0; i < list.length; i++) {
+                    list[i].read = true;
+                }
+                saveNotificationsList(list);
+
+                updateBrowserNotifUI();
+                renderNotificationsModalList(list);
+                window.openModal('notificationsModal');
+                refreshTelegramBlock();
+            };
+
+            function renderNotificationsModalList(list) {
+                var container = document.getElementById('notificationsListContainer');
+                if (!container) return;
+                if (!list || list.length === 0) {
+                    container.innerHTML = '<div class="p-6 rounded-2xl bg-cream-100 border border-evergreen-800/10 text-center space-y-1.5">' +
+                        '<p class="font-serif font-bold text-base text-evergreen-900">No notifications yet</p>' +
+                        '<p class="text-xs text-evergreen-800/70">When names are drawn or the person you are gifting updates their wishlist, you will see an alert here!</p>' +
+                    '</div>';
+                    return;
+                }
+
+                container.innerHTML = list.map(function(n) {
+                    var timeLabel = '';
+                    try {
+                        timeLabel = new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {}
+                    return '<div onclick="openRoomFromNotification(\'' + escapeHtml(n.roomCode || '') + '\')" role="button" tabindex="0" class="p-3.5 rounded-2xl bg-cream-100 hover:bg-cream-200/80 border border-evergreen-800/15 cursor-pointer transition-colors space-y-1">' +
+                        '<div class="flex items-center justify-between gap-2">' +
+                            '<span class="font-bold text-xs text-crimson-700">' + escapeHtml(n.title) + '</span>' +
+                            '<span class="text-[10px] font-semibold text-evergreen-800/60">' + escapeHtml(timeLabel) + '</span>' +
+                        '</div>' +
+                        '<p class="text-xs text-evergreen-950 leading-relaxed">' + escapeHtml(n.body) + '</p>' +
+                    '</div>';
+                }).join('');
+            }
+
+            window.openRoomFromNotification = function(roomCode) {
+                window.closeModal('notificationsModal');
+                if (roomCode) {
+                    window.joinGroupByCode(roomCode);
+                }
+            };
+
+            window.clearAllNotifications = function() {
+                saveNotificationsList([]);
+                renderNotificationsModalList([]);
+                showToast('Notifications cleared.', 'info');
+            };
+
+            function updateBrowserNotifUI() {
+                var statusText = document.getElementById('browserNotifStatusText');
+                var btn = document.getElementById('enableBrowserNotifBtn');
+                if (!statusText || !btn) return;
+                if (typeof Notification === 'undefined') {
+                    statusText.textContent = 'In-app alerts active';
+                    btn.classList.add('hidden');
+                    return;
+                }
+                if (Notification.permission === 'granted') {
+                    statusText.textContent = 'Device popup alerts are enabled!';
+                    btn.textContent = 'Enabled';
+                    btn.disabled = true;
+                    btn.className = 'px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold text-[11px] shrink-0';
+                } else if (Notification.permission === 'denied') {
+                    statusText.textContent = 'Blocked by browser settings (in-app bell still works)';
+                    btn.classList.add('hidden');
+                } else {
+                    statusText.textContent = 'Get notified when your recipient updates their list';
+                    btn.textContent = 'Enable';
+                    btn.disabled = false;
+                }
+            }
+
+            window.requestBrowserNotifications = function() {
+                if (typeof Notification === 'undefined') {
+                    showToast('In-app bell notifications are already active!', 'info');
+                    return;
+                }
+                Notification.requestPermission().then(function(perm) {
+                    updateBrowserNotifUI();
+                    if (perm === 'granted') {
+                        showToast('Device notifications enabled!', 'success');
+                    } else {
+                        showToast('In-app bell notifications will still alert you here.', 'info');
+                    }
+                }).catch(function() {
+                    showToast('In-app bell notifications are active.', 'info');
+                });
+            };
+
+            function sendBrowserSystemNotification(title, body) {
+                try {
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        new Notification(title, { body: body });
+                    }
+                } catch (e) {}
+            }
+
+            // =================================================================
+            // TELEGRAM NOTIFICATIONS (via Google Apps Script)
+            // =================================================================
+// =================================================================
+            // ANONYMOUS CHAT (Secret Santa <-> recipient)
+            // Messages are separate Firestore docs: secret_santa_chats/{pair}/messages/{id}
+            // =================================================================
+            var chatState = null;
+            var chatTimer = null;
+
+// ---- Unread indicator: checks only the LAST message of each chat (1 read per chat) ----
+            var chatUnreadTimer = null;
+            var chatToastedId = {};
+
+            function chatSeenKey(info) { return 'ss2027_chatseen_' + info.pair; }
+
+            function chatMarkSeen(pair, id) {
+                try { setStore('ss2027_chatseen_' + pair, id); } catch (e) {}
+                ['santa', 'recipient'].forEach(function(r) {
+                    var info = chatPairInfo(r);
+                    if (info && info.pair === pair) {
+                        var b = document.getElementById('chatBadge_' + r);
+                        if (b) b.classList.add('hidden');
+                    }
+                });
+            }
+
+            function chatFetchLast(pair) {
+                var url = FIRESTORE_CHAT_BASE + encodeURIComponent(pair) + ':runQuery';
+                return fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ structuredQuery: {
+                        from: [{ collectionId: 'messages' }],
+                        orderBy: [{ field: { fieldPath: '__name__' }, direction: 'DESCENDING' }],
+                        limit: 1
+                    } })
+                }).then(function(r) { return r.ok ? r.json() : null; })
+                  .then(function(arr) {
+                    if (!arr || !arr.length || !arr[0].document) return { none: true };
+                    var d = arr[0].document, f = d.fields || {};
+                    return { id: String(d.name).split('/').pop(), from: f.from ? f.from.stringValue : '' };
+                }).catch(function() { return null; });
+            }
+
+            function chatCheckUnread() {
+                if (!currentUser || !currentGroupId || !currentGroupData || currentGroupData.status !== 'drawn') return;
+                ['santa', 'recipient'].forEach(function(role) {
+                    var info = chatPairInfo(role);
+                    if (!info) return;
+                    chatFetchLast(info.pair).then(function(last) {
+                        if (!last || last.none) return;
+                        var modal = document.getElementById('chatModal');
+                        var open = chatState && chatState.pair === info.pair && modal && !modal.classList.contains('hidden');
+                        if (open) { chatMarkSeen(info.pair, last.id); return; }
+                        var seen = getStore('ss2027_chatseen_' + info.pair) || '';
+                        var unread = last.from !== role && last.id > seen;
+                        var badge = document.getElementById('chatBadge_' + role);
+                        if (badge) badge.classList.toggle('hidden', !unread);
+                        if (unread && chatToastedId[info.pair] !== last.id) {
+                            chatToastedId[info.pair] = last.id;
+                            showToast(role === 'santa' ? 'New reply from ' + info.recipientName + '!' : 'Your Secret Santa wrote you a message!', 'info');
+                        }
+                    });
+                });
+            }
+
+            function chatStartUnreadWatch() {
+                if (chatUnreadTimer) return;
+                chatCheckUnread();
+                chatUnreadTimer = setInterval(chatCheckUnread, 15000);
+            }
+
+            function chatPairInfo(role) {
+                var data = currentGroupData;
+                var me = findMyParticipantInRoom(data);
+                if (!data || !me || data.status !== 'drawn' || !data.assignments) return null;
+                var santaId = null, recipId = null;
+                if (role === 'santa') {
+                    santaId = me.id;
+                    recipId = data.assignments[me.id];
+                } else {
+                    recipId = me.id;
+                    Object.keys(data.assignments).forEach(function(k) {
+                        if (data.assignments[k] === me.id) santaId = k;
+                    });
+                }
+                if (!santaId || !recipId) return null;
+                var recipient = (data.participants || []).find(function(p) { return p.id === recipId; });
+                return {
+                    role: role,
+                    pair: String(data.code).toUpperCase() + '_' + santaId + '_' + recipId,
+                    recipientName: recipient ? recipient.name : 'your recipient'
+                };
+            }
+
+            function chatParseMessages(json) {
+                var docs = (json && json.documents) || [];
+                return docs.map(function(d) {
+                    var f = d.fields || {};
+                    return {
+                        id: String(d.name || '').split('/').pop(),
+                        from: f.from ? f.from.stringValue : '',
+                        text: f.text ? f.text.stringValue : '',
+                        ts: f.ts ? Number(f.ts.integerValue) : 0
+                    };
+                }).sort(function(a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+            }
+
+            function chatFetch() {
+                if (!chatState) return Promise.resolve(null);
+                return fetch(FIRESTORE_CHAT_BASE + encodeURIComponent(chatState.pair) + '/messages?pageSize=300&t=' + Date.now())
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(j) { return j ? chatParseMessages(j) : null; })
+                    .catch(function() { return null; });
+            }
+
+            function chatRender(msgs, force) {
+                var box = document.getElementById('chatMessages');
+                if (!box || !chatState) return;
+                if (msgs === null) {
+                    if (force) box.innerHTML = '<p class="m-auto text-xs text-evergreen-800/60 text-center">Could not load messages. Try again in a moment.</p>';
+                    return;
+                }
+                var sig = msgs.length + ':' + (msgs.length ? msgs[msgs.length - 1].id : '');
+                if (!force && chatState.sig === sig) return;
+                var firstRender = chatState.sig === '';
+                chatState.sig = sig;
+                if (msgs.length) chatMarkSeen(chatState.pair, msgs[msgs.length - 1].id);
+                var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+
+                if (msgs.length === 0) {
+                    box.innerHTML = '<p class="m-auto text-xs text-evergreen-800/60 text-center px-6">' +
+                        (chatState.role === 'santa'
+                            ? 'No messages yet. Ask something about the gift — your name stays hidden!'
+                            : 'No messages yet. If your Secret Santa writes, you will see it here.') +
+                    '</p>';
+                    return;
+                }
+
+                box.innerHTML = msgs.map(function(m) {
+                    var mine = m.from === chatState.role;
+                    var timeLabel = '';
+                    try { timeLabel = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) {}
+                    var who = mine ? 'You' : (chatState.role === 'santa' ? chatState.recipientName : 'Your Secret Santa');
+                    return '<div class="max-w-[85%] ' + (mine ? 'self-end' : 'self-start') + '">' +
+                        '<div class="px-3.5 py-2 rounded-2xl text-sm break-words whitespace-pre-line ' +
+                            (mine ? 'bg-crimson-600 text-white rounded-br-md' : 'bg-cream-200 text-evergreen-950 rounded-bl-md') + '">' +
+                            escapeHtml(m.text) +
+                        '</div>' +
+                        '<div class="text-[10px] text-evergreen-800/55 mt-0.5 ' + (mine ? 'text-right' : 'text-left') + '">' +
+                            escapeHtml(who) + (timeLabel ? ' · ' + escapeHtml(timeLabel) : '') +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+                if (firstRender || nearBottom) box.scrollTop = box.scrollHeight;
+            }
+
+            function chatRefresh(force) {
+                var modal = document.getElementById('chatModal');
+                if (!chatState || !modal || modal.classList.contains('hidden')) { chatStopTimer(); return Promise.resolve(); }
+                return chatFetch().then(function(msgs) { chatRender(msgs, force); });
+            }
+
+            function chatStopTimer() {
+                if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+            }
+
+            window.openChat = function(role) {
+                if (!requireSignedInUser()) return;
+                var info = chatPairInfo(role);
+                if (!info) { showToast('Chat opens after the names are drawn.', 'info'); return; }
+                chatState = { role: info.role, pair: info.pair, recipientName: info.recipientName, sig: '', sending: false };
+
+                document.getElementById('chatTitle').textContent = role === 'santa'
+                    ? 'Message to ' + info.recipientName
+                    : 'Your Secret Santa';
+                document.getElementById('chatSubtitle').textContent = role === 'santa'
+                    ? 'They will see your messages as "from your Secret Santa". Your name stays hidden.'
+                    : "You won't know who it is. That's part of the fun!";
+                document.getElementById('chatInput').value = '';
+                document.getElementById('chatMessages').innerHTML = '<p class="m-auto text-xs text-evergreen-800/60">Loading…</p>';
+
+                window.openModal('chatModal');
+                chatRefresh(true);
+                chatStopTimer();
+                chatTimer = setInterval(function() { chatRefresh(false); }, 7000);
+            };
+
+            window.closeChat = function() {
+                chatStopTimer();
+                chatState = null;
+                window.closeModal('chatModal');
+            };
+
+            window.sendChatMessage = function() {
+                if (!chatState || chatState.sending) return;
+                var input = document.getElementById('chatInput');
+                var btn = document.getElementById('chatSendBtn');
+                var text = input.value.trim();
+                if (!text) return;
+                if (text.length > 500) text = text.slice(0, 500);
+
+                var state = chatState;
+                state.sending = true;
+                if (btn) btn.disabled = true;
+
+                var ts = Date.now();
+                var msgId = ts.toString(36).padStart(10, '0') + Math.random().toString(36).slice(2, 6);
+                var url = FIRESTORE_CHAT_BASE + encodeURIComponent(state.pair) + '/messages?documentId=' + encodeURIComponent(msgId);
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: {
+                        from: { stringValue: state.role },
+                        text: { stringValue: text },
+                        ts: { integerValue: String(ts) }
+                    } })
+                }).then(function(r) {
+                    if (!r.ok) throw new Error('http ' + r.status);
+                    input.value = '';
+                    if (SCRIPT_URL && SCRIPT_URL.indexOf('PASTE') !== 0) {
+                        tgApi({ action: 'chat', room: String(currentGroupId || ''), pair: state.pair, msgId: msgId });
+                    }
+                    return chatRefresh(true);
+                }).catch(function() {
+                    showToast('Message was not sent. Please try again.', 'error');
+                }).then(function() {
+                    state.sending = false;
+                    if (btn) btn.disabled = false;
+                    if (input) input.focus();
+                });
+            };
+
+            function tgApi(payload) {
+                return fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+                    .then(function(r) { return r.json(); })
+                    .catch(function() { return null; });
+            }
+
+            function tgAuth() {
+                return { userKey: normalizeUserKey(currentUser.name), pin: currentUser.pin };
+            }
+
+            function tgRandomToken() {
+                var a = new Uint8Array(12);
+                crypto.getRandomValues(a);
+                return Array.prototype.map.call(a, function(b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+            }
+
+            function tgStopPolling() {
+                if (tgPollTimer) { clearInterval(tgPollTimer); tgPollTimer = null; }
+            }
+
+            function tgSetUi(state, text) {
+                var st = document.getElementById('tgStatusText');
+                var link = document.getElementById('tgConnectLink');
+                var un = document.getElementById('tgUnlinkBtn');
+                if (!st) return;
+                st.textContent = text;
+                link.classList.toggle('hidden', state !== 'unlinked');
+                un.classList.toggle('hidden', state !== 'linked');
+            }
+
+            function refreshTelegramBlock() {
+                if (!currentUser) return;
+                if (!SCRIPT_URL || SCRIPT_URL.indexOf('PASTE') === 0) { tgSetUi('off', 'Не настроено'); return; }
+                tgStopPolling();
+                tgSetUi('off', 'Проверяю…');
+                var auth = tgAuth();
+
+                tgApi({ action: 'status', userKey: auth.userKey, pin: auth.pin }).then(function(res) {
+                    if (!res) { tgSetUi('off', 'Нет ответа от скрипта (проверьте SCRIPT_URL и доступ «Все»)'); return; }
+                    if (!res.ok) { tgSetUi('off', 'Ошибка: ' + (res.reason || 'unknown')); return; }
+                    if (res.linked) { tgSetUi('linked', 'Подключено ✓ Пришлю уведомления о жеребьёвке и вишлистах'); return; }
+
+                    var token = tgRandomToken();
+                    tgApi({ action: 'link', userKey: auth.userKey, pin: auth.pin, token: token }).then(function(r2) {
+                        if (!r2 || !r2.ok) { tgSetUi('off', 'Не удалось создать ссылку'); return; }
+                        document.getElementById('tgConnectLink').href = 'https://t.me/' + BOT_USERNAME + '?start=' + token;
+                        tgSetUi('unlinked', 'Нажмите «Подключить», затем Start в Telegram');
+
+                        var started = Date.now();
+                        tgPollTimer = setInterval(function() {
+                            var modal = document.getElementById('notificationsModal');
+                            if (Date.now() - started > 5 * 60 * 1000 || modal.classList.contains('hidden')) { tgStopPolling(); return; }
+                            tgApi({ action: 'status', userKey: auth.userKey, pin: auth.pin }).then(function(s) {
+                                if (s && s.linked) {
+                                    tgStopPolling();
+                                    tgSetUi('linked', 'Подключено ✓ Пришлю уведомления о жеребьёвке и вишлистах');
+                                    showToast('Telegram подключён!', 'success');
+                                }
+                            });
+                        }, 4000);
+                    });
+                });
+            }
+
+            window.unlinkTelegram = function() {
+                if (!currentUser) return;
+                var auth = tgAuth();
+                tgApi({ action: 'unlink', userKey: auth.userKey, pin: auth.pin }).then(function() {
+                    showToast('Telegram отключён.', 'info');
+                    refreshTelegramBlock();
+                });
+            };
+
+            function startGlobalNotificationWatcher() {
+                if (globalNotifTimer) clearInterval(globalNotifTimer);
+                globalNotifTimer = setInterval(function() {
+                    if (!currentUser) return;
+                    var rooms = getSavedRoomsArray();
+                    for (var i = 0; i < Math.min(rooms.length, 5); i++) {
+                        (function(code) {
+                            syncFetchRoom(code).then(function(fresh) {
+                                if (fresh) {
+                                    evaluateRoomUpdatesForRecipient(fresh);
+                                }
+                            });
+                        })(rooms[i].code);
+                    }
+                }, 12000);
+            }
+
+            window.handleBrandClick = function() {
+                if (!currentUser) {
+                    showView('authView');
+                } else {
+                    window.goHome();
+                }
+            };
+
+            function requireSignedInUser() {
+                if (!currentUser) {
+                    showView('authView');
+                    return false;
+                }
+                return true;
+            }
+
+            // =================================================================
+            // ROOM STORAGE & HOST CHECKS
+            // =================================================================
+            function getRoomLocally(code) {
+                var c = code.toUpperCase();
+                if (memoryRooms[c]) return memoryRooms[c];
+                var raw = getStore('ss2027_room_' + c);
+                if (raw) {
+                    try {
+                        var parsed = JSON.parse(raw);
+                        memoryRooms[c] = parsed;
+                        return parsed;
+                    } catch (e) {}
+                }
+                return null;
+            }
+
+            function saveRoomLocally(code, roomObj) {
+                var c = code.toUpperCase();
+                memoryRooms[c] = roomObj;
+                setStore('ss2027_room_' + c, JSON.stringify(roomObj));
+            }
+
+            function isCurrentUserHost(roomData) {
+                if (!roomData || !currentUser) return false;
+                if (roomData.hostUserId && roomData.hostUserId === currentUser.id) return true;
+                if (roomData.hostName && normalizeUserKey(roomData.hostName) === normalizeUserKey(currentUser.name)) return true;
+                return false;
+            }
+
+            function isCurrentParticipantOwner(participant) {
+                if (!participant || !currentUser) return false;
+                if (participant.userId && participant.userId === currentUser.id) return true;
+                if (normalizeUserKey(participant.name) === normalizeUserKey(currentUser.name) && participant.pin === currentUser.pin) return true;
+                return false;
+            }
+
+            function isWishlistDeadlinePassed(roomData) {
+                if (!roomData || !roomData.wishlistDeadline) return false;
+                try {
+                    var parts = roomData.wishlistDeadline.split('-');
+                    if (parts.length !== 3) return false;
+                    var endOfDay = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59, 999);
+                    return Date.now() > endOfDay.getTime();
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // =================================================================
+            // SAVED ROOMS LIST (SYNCED TO LOGGED-IN USER PROFILE)
+            // =================================================================
+            function getSavedRoomsArray() {
+                if (currentUser && Array.isArray(currentUser.rooms)) {
+                    return currentUser.rooms;
+                }
+                return [];
+            }
+
+            function recordRecentRoom(code, name, isHostFlag) {
+                if (!currentUser) return;
+                var c = code.toUpperCase();
+                var list = getSavedRoomsArray().filter(function(r) { return r.code !== c; });
+                list.unshift({
+                    code: c,
+                    name: name || c,
+                    isHost: Boolean(isHostFlag)
+                });
+                currentUser.rooms = list.slice(0, 12);
+                syncSaveUser(currentUser);
+                renderLandingRooms();
+                renderRecentRooms();
+            }
+
+            window.removeSavedRoom = function(code, ev) {
+                if (ev && ev.stopPropagation) ev.stopPropagation();
+                if (!currentUser) return;
+                var c = code.toUpperCase();
+                currentUser.rooms = getSavedRoomsArray().filter(function(r) { return r.code !== c; });
+                syncSaveUser(currentUser);
+                renderLandingRooms();
+                renderRecentRooms();
+            };
+
+            function renderLandingRooms() {
+                var section = document.getElementById('landingRoomsSection');
+                var container = document.getElementById('landingRoomsList');
+                if (!section || !container) return;
+
+                var list = getSavedRoomsArray();
+                if (list.length === 0) {
+                    section.classList.add('hidden');
+                    return;
+                }
+                section.classList.remove('hidden');
+                container.innerHTML = list.map(function(r) {
+                    var hostTag = r.isHost
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold-500/20 text-gold-400 border border-gold-400/30">Host</span>'
+                        : '';
+                    return '<div onclick="joinGroupByCode(\'' + escapeHtml(r.code) + '\')" role="button" tabindex="0" class="w-full px-4 py-3.5 rounded-2xl bg-evergreen-800/75 hover:bg-evergreen-800 border border-gold-400/25 flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01] shadow-md">' +
+                        '<div class="flex items-center gap-3 min-w-0">' +
+                            '<div class="w-9 h-9 rounded-xl bg-crimson-600/25 border border-crimson-400/30 text-gold-400 flex items-center justify-center shrink-0">' +
+                                '<i data-lucide="gift" class="w-4 h-4"></i>' +
+                            '</div>' +
+                            '<div class="min-w-0">' +
+                                '<div class="flex items-center gap-2">' +
+                                    '<span class="font-serif font-bold text-base text-cream-50 truncate">' + escapeHtml(r.name) + '</span>' +
+                                    hostTag +
+                                '</div>' +
+                                '<span class="font-mono text-xs font-bold tracking-widest text-gold-400">' + escapeHtml(r.code) + '</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-1.5 shrink-0">' +
+                            '<button type="button" onclick="removeSavedRoom(\'' + escapeHtml(r.code) + '\', event)" title="Remove from list" class="p-1.5 rounded-lg text-cream-200/50 hover:text-cream-50 hover:bg-evergreen-950/60 transition-colors">' +
+                                '<i data-lucide="x" class="w-4 h-4"></i>' +
+                            '</button>' +
+                            '<i data-lucide="arrow-right" class="w-4 h-4 text-gold-400"></i>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+                renderAllIcons();
+            }
+
+            function renderRecentRooms() {
+                var section = document.getElementById('recentRoomsSection');
+                var container = document.getElementById('recentRoomsList');
+                if (!section || !container) return;
+
+                var list = getSavedRoomsArray();
+                if (list.length === 0) {
+                    section.classList.add('hidden');
+                    return;
+                }
+                section.classList.remove('hidden');
+                container.innerHTML = list.map(function(r) {
+                    return '<button type="button" onclick="joinGroupByCode(\'' + escapeHtml(r.code) + '\')" class="w-full px-3.5 py-2.5 rounded-xl bg-cream-100 hover:bg-cream-200 border border-evergreen-800/10 flex items-center justify-between text-left transition-colors">' +
+                        '<span class="font-semibold text-sm text-evergreen-950 truncate">' + escapeHtml(r.name) + '</span>' +
+                        '<span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-evergreen-900 text-gold-400">' + escapeHtml(r.code) + '</span>' +
+                    '</button>';
+                }).join('');
+            }
+
+            // =================================================================
+            // FIRESTORE REST + NTFY CLOUD SYNC FOR ROOMS
+            // =================================================================
+            function syncSaveRoom(code, roomObj) {
+                var upperCode = code.toUpperCase();
+                roomObj.updatedAt = Date.now();
+                saveRoomLocally(upperCode, roomObj);
+
+                var firestoreReq = fetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(encodeFirestoreFields(roomObj))
+                }).catch(function() { return null; });
+
+                var ntfyReq = fetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode), {
+                    method: "POST",
+                    body: JSON.stringify(roomObj)
+                }).catch(function() { return null; });
+
+                return Promise.all([firestoreReq, ntfyReq]).then(function(r) {
+                    // Tell the Telegram notifier that the room changed (it decides who to message)
+                    if (SCRIPT_URL && SCRIPT_URL.indexOf('PASTE') !== 0) {
+                        tgApi({ action: 'notify', room: upperCode });
+                    }
+                    return r;
+                });
+            }
+
+            function syncFetchRoom(code) {
+                var upperCode = code.toUpperCase();
+
+                var firestoreFetch = fetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode) + "?t=" + Date.now(), {
+                    method: "GET"
+                }).then(function(res) {
+                    if (!res.ok) return null;
+                    return res.json().then(decodeFirestoreDoc);
+                }).catch(function() { return null; });
+
+                var ntfyFetch = fetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode) + "/json?poll=1&since=all", {
+                    method: "GET"
+                }).then(function(res) {
+                    if (!res.ok) return null;
+                    return res.text().then(function(txt) {
+                        if (!txt) return null;
+                        var lines = txt.trim().split('\n');
+                        var newest = null;
+                        for (var i = lines.length - 1; i >= 0; i--) {
+                            try {
+                                var evt = JSON.parse(lines[i]);
+                                if (evt && evt.message) {
+                                    var candidate = JSON.parse(evt.message);
+                                    if (candidate && candidate.code === upperCode) {
+                                        newest = candidate;
+                                        break;
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        return newest;
+                    });
+                }).catch(function() { return null; });
+
+                return Promise.all([firestoreFetch, ntfyFetch]).then(function(results) {
+                    var fsRoom = results[0];
+                    var ntfyRoom = results[1];
+                    var localRoom = getRoomLocally(upperCode);
+
+                    var candidates = [fsRoom, ntfyRoom, localRoom].filter(Boolean);
+                    if (candidates.length === 0) return null;
+
+                    candidates.sort(function(a, b) {
+                        return (b.updatedAt || 0) - (a.updatedAt || 0);
+                    });
+
+                    var best = candidates[0];
+                    saveRoomLocally(upperCode, best);
+                    return best;
+                });
+            }
+
+            // =================================================================
+            // VIEW NAVIGATION
+            // =================================================================
+            function showView(viewId) {
+                var views = ['authView', 'landingView', 'createRoomView', 'joinRoomView', 'roomView'];
+                for (var i = 0; i < views.length; i++) {
+                    var el = document.getElementById(views[i]);
+                    if (el) el.classList.toggle('hidden', views[i] !== viewId);
+                }
+
+                var headerActions = document.getElementById('headerActions');
+                if (headerActions) {
+                    if (viewId === 'roomView') {
+                        headerActions.innerHTML = '<button type="button" onclick="goHome()" class="px-3.5 py-2 rounded-xl bg-evergreen-800/80 hover:bg-evergreen-800 text-cream-100 text-xs font-semibold flex items-center gap-1.5 border border-cream-200/15 transition-colors"><i data-lucide="log-out" class="w-3.5 h-3.5 text-gold-400"></i><span>Leave Room</span></button>';
+                    } else if (viewId === 'landingView') {
+                        headerActions.innerHTML = '';
+                        renderLandingRooms();
+                    } else if (viewId === 'authView') {
+                        headerActions.innerHTML = '';
+                    } else {
+                        headerActions.innerHTML = '<button type="button" onclick="goHome()" class="px-3.5 py-2 rounded-xl bg-evergreen-800/80 hover:bg-evergreen-800 text-cream-100 text-xs font-semibold flex items-center gap-1.5 border border-cream-200/15 transition-colors"><i data-lucide="arrow-left" class="w-3.5 h-3.5 text-gold-400"></i><span>Home</span></button>';
+                    }
+                }
+                renderAllIcons();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            window.goHome = function() {
+                if (!requireSignedInUser()) return;
+                if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+                if (chatUnreadTimer) { clearInterval(chatUnreadTimer); chatUnreadTimer = null; }
+                currentGroupId = null;
+                currentGroupData = null;
+                removeStore('ss2027_active_room');
+                showView('landingView');
+            };
+
+            window.openCreateRoomView = function() {
+                if (!requireSignedInUser()) return;
+                showView('createRoomView');
+            };
+
+            window.openJoinRoomView = function() {
+                if (!requireSignedInUser()) return;
+                renderRecentRooms();
+                showView('joinRoomView');
+            };
+
+            function generateRoomCode() {
+                var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                var code = '';
+                for (var i = 0; i < 6; i++) {
+                    code += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return code;
+            }
+
+            function openRoom(code, roomData) {
+                currentGroupId = code.toUpperCase();
+                currentGroupData = roomData;
+                setStore('ss2027_active_room', currentGroupId);
+                evaluateRoomUpdatesForRecipient(roomData);
+                showView('roomView');
+                window.switchRoomTab('participants');
+                renderRoomDashboard();
+                chatStartUnreadWatch();
+
+                if (syncTimer) clearInterval(syncTimer);
+                syncTimer = setInterval(function() {
+                    if (!currentGroupId) return;
+                    syncFetchRoom(currentGroupId).then(function(fresh) {
+                        if (fresh && JSON.stringify(fresh) !== JSON.stringify(currentGroupData)) {
+                            currentGroupData = fresh;
+                            evaluateRoomUpdatesForRecipient(fresh);
+                            renderRoomDashboard();
+                        }
+                    });
+                }, 6000);
+            }
+
+            // =================================================================
+            // CREATE & JOIN ROOM ACTIONS
+            // =================================================================
+            window.createRoomNow = function() {
+                if (!requireSignedInUser()) return;
+                var nameInput = document.getElementById('groupNameInput');
+                var budgetInput = document.getElementById('groupBudgetInput');
+                var dateInput = document.getElementById('groupDateInput');
+                var deadlineInput = document.getElementById('groupWishlistDeadlineInput');
+                var notesInput = document.getElementById('groupNotesInput');
+
+                var name = nameInput ? nameInput.value.trim() : '';
+                var budget = budgetInput ? budgetInput.value.trim() : '';
+                var date = dateInput ? dateInput.value : '';
+                var wishlistDeadline = deadlineInput ? deadlineInput.value : '';
+                var notes = notesInput ? notesInput.value.trim() : '';
+
+                if (!name) {
+                    showToast('Please enter a group name.', 'error');
+                    if (nameInput) nameInput.focus();
+                    return;
+                }
+
+                var btn = document.getElementById('createGroupBtn');
+                var btnLabel = document.getElementById('createGroupBtnLabel');
+                if (btn) btn.disabled = true;
+                if (btnLabel) btnLabel.textContent = 'Creating Room...';
+
+                var code = generateRoomCode();
+                var roomData = {
+                    code: code,
+                    name: name,
+                    budget: budget,
+                    date: date,
+                    wishlistDeadline: wishlistDeadline,
+                    notes: notes,
+                    hostUserId: currentUser.id,
+                    hostName: currentUser.name,
+                    status: 'open',
+                    participants: [],
+                    assignments: {},
+                    updatedAt: Date.now()
+                };
+
+                saveRoomLocally(code, roomData);
+
+                syncSaveRoom(code, roomData).then(function() {
+                    if (btn) btn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = 'Create & Open Room';
+                    recordRecentRoom(code, name, true);
+                    showToast('Room "' + name + '" created! Code: ' + code, 'success');
+                    openRoom(code, roomData);
+                });
+            };
+
+            window.joinRoomNow = function() {
+                if (!requireSignedInUser()) return;
+                var codeInput = document.getElementById('joinCodeInput');
+                var rawCode = codeInput ? codeInput.value : '';
+                window.joinGroupByCode(rawCode);
+            };
+
+            window.joinGroupByCode = function(rawCode) {
+                if (!requireSignedInUser()) return;
+                var code = String(rawCode || '').trim().replace(/\s+/g, '').toUpperCase();
+                if (!code || code.length < 4) {
+                    showToast('Please enter a valid 6-character room code.', 'error');
+                    return;
+                }
+
+                var btn = document.getElementById('joinGroupBtn');
+                var btnLabel = document.getElementById('joinGroupBtnLabel');
+                if (btn) btn.disabled = true;
+                if (btnLabel) btnLabel.textContent = 'Finding Room...';
+
+                syncFetchRoom(code).then(function(roomData) {
+                    if (btn) btn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = 'Enter Room';
+
+                    if (!roomData) {
+                        showToast('Could not find room "' + code + '". Double-check the 6-character code!', 'error');
+                        showView('joinRoomView');
+                        return;
+                    }
+
+                    saveRoomLocally(code, roomData);
+                    recordRecentRoom(code, roomData.name || code, isCurrentUserHost(roomData));
+                    openRoom(code, roomData);
+                });
+            };
+
+            window.refreshCurrentRoom = function() {
+                if (!currentGroupId) return;
+                syncFetchRoom(currentGroupId).then(function(fresh) {
+                    if (fresh) {
+                        currentGroupData = fresh;
+                        evaluateRoomUpdatesForRecipient(fresh);
+                        renderRoomDashboard();
+                        showToast('Room synced!', 'info');
+                    }
+                });
+            };
+
+            // =================================================================
+            // DASHBOARD & PARTICIPANT CARDS
+            // =================================================================
+            function findMyParticipantInRoom(data) {
+                if (!data || !currentUser) return null;
+                var participants = Array.isArray(data.participants) ? data.participants : [];
+                for (var i = 0; i < participants.length; i++) {
+                    if (isCurrentParticipantOwner(participants[i])) return participants[i];
+                }
+                return null;
+            }
+
+            function renderRoomDashboard() {
+                var data = currentGroupData;
+                if (!data) return;
+
+                var participants = Array.isArray(data.participants) ? data.participants : [];
+                var isDrawn = data.status === 'drawn';
+                var isHost = isCurrentUserHost(data);
+                var myEntry = findMyParticipantInRoom(data);
+
+                document.getElementById('displayGroupName').textContent = data.name || 'Secret Santa';
+                document.getElementById('displayGroupNotes').textContent = data.notes || '';
+                document.getElementById('displayGroupCode').textContent = data.code;
+                document.getElementById('emptyStateCode').textContent = data.code;
+                document.getElementById('displayBudget').textContent = data.budget ? 'Budget: ' + data.budget : 'No budget set';
+                document.getElementById('displayDate').textContent = formatDisplayDate(data.date);
+                document.getElementById('participantCountPill').textContent = String(participants.length);
+
+                var deadlinePassed = isWishlistDeadlinePassed(data);
+                var deadlineBadge = document.getElementById('roomDeadlineBadge');
+                if (data.wishlistDeadline) {
+                    deadlineBadge.classList.remove('hidden');
+                    var formattedDeadline = formatDisplayDate(data.wishlistDeadline);
+                    document.getElementById('displayWishlistDeadline').textContent = deadlinePassed
+                        ? 'Wishlist Deadline Passed (' + formattedDeadline + ')'
+                        : 'Wishlists Due: ' + formattedDeadline;
+                    deadlineBadge.className = deadlinePassed
+                        ? 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-crimson-600/25 text-red-200 border border-red-400/35'
+                        : 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-evergreen-950/70 text-cream-100 border border-cream-200/15';
+                } else {
+                    deadlineBadge.classList.add('hidden');
+                }
+
+                var tabRegisterBtn = document.getElementById('tabRegisterBtn');
+                var registerTabLabel = document.getElementById('registerTabLabel');
+                if (registerTabLabel) {
+                    registerTabLabel.textContent = myEntry ? 'Edit My Wishlist' : 'Add My Wishlist';
+                }
+                if (tabRegisterBtn) {
+                    var hideRegTab = deadlinePassed || (isDrawn && !myEntry);
+                    tabRegisterBtn.classList.toggle('hidden', hideRegTab);
+                }
+
+                var statusBadge = document.getElementById('roomStatusBadge');
+                if (isDrawn) {
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Names Drawn';
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
+                } else {
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Gathering Friends';
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30';
+                }
+
+                document.getElementById('hostCrownBadge').classList.toggle('hidden', !isHost);
+                var chatBox = document.getElementById('chatButtonsBox');
+                if (chatBox) chatBox.classList.toggle('hidden', !(isDrawn && myEntry));
+                var headerDeleteBtn = document.getElementById('headerDeleteRoomBtn');
+                if (headerDeleteBtn) {
+                    headerDeleteBtn.classList.toggle('hidden', !isHost);
+                }
+
+                var emptyState = document.getElementById('emptyParticipantsState');
+                var grid = document.getElementById('participantsGrid');
+                if (participants.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    grid.innerHTML = '';
+                } else {
+                    emptyState.classList.add('hidden');
+                    grid.innerHTML = participants.map(function(p) { return renderParticipantCard(p, isDrawn); }).join('');
+                }
+
+                var preDrawCard = document.getElementById('preDrawControlCard');
+                var postDrawCard = document.getElementById('postDrawControlCard');
+
+                if (isDrawn) {
+                    preDrawCard.classList.add('hidden');
+                    postDrawCard.classList.remove('hidden');
+                    document.getElementById('hostResetActionBox').classList.toggle('hidden', !isHost);
+                } else {
+                    preDrawCard.classList.remove('hidden');
+                    postDrawCard.classList.add('hidden');
+
+                    var count = participants.length;
+                    document.getElementById('drawProgressText').textContent = count + ' / 3 minimum';
+
+                    var hostActionBox = document.getElementById('hostDrawActionBox');
+                    var guestWaitingBox = document.getElementById('guestWaitingDrawBox');
+                    var drawBtn = document.getElementById('drawNamesBtn');
+
+                    if (isHost) {
+                        hostActionBox.classList.remove('hidden');
+                        guestWaitingBox.classList.add('hidden');
+                        drawBtn.disabled = count < 3;
+                    } else {
+                        hostActionBox.classList.add('hidden');
+                        guestWaitingBox.classList.remove('hidden');
+                    }
+                }
+
+                renderAllIcons();
+            }
+
+            function renderParticipantCard(participant, isDrawn) {
+                var itemCount = Array.isArray(participant.wishlist) ? participant.wishlist.length : 0;
+                var avatarHtml = renderAvatarBadge(participant.avatar, 'w-12 h-12', participant.name);
+                var safeId = escapeHtml(participant.id);
+                var isHost = isCurrentUserHost(currentGroupData);
+                var isMine = isCurrentParticipantOwner(participant);
+
+                var youPill = isMine
+                    ? '<span class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600/15 text-emerald-800 border border-emerald-600/25">You</span>'
+                    : '';
+
+                var rightButtonHtml = '';
+                if (isDrawn) {
+                    rightButtonHtml = '<button type="button" onclick="requestRevealMatch(\'' + safeId + '\')" class="flex-1 py-2.5 px-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow transition-colors"><i data-lucide="gift" class="w-3.5 h-3.5 text-gold-400"></i><span>Unwrap Match</span></button>';
+                } else if (isWishlistDeadlinePassed(currentGroupData)) {
+                    rightButtonHtml = '<span class="py-2.5 px-3 rounded-xl bg-cream-200/70 text-evergreen-800/70 font-semibold text-xs">Locked</span>';
+                } else if (isMine) {
+                    rightButtonHtml = '<button type="button" onclick="requestEditParticipant(\'' + safeId + '\')" class="py-2.5 px-3.5 rounded-xl bg-evergreen-900 hover:bg-evergreen-800 text-cream-50 font-semibold text-xs transition-colors">Edit</button>';
+                }
+
+                var removeBtnHtml = '';
+                if (!isDrawn && isHost) {
+                    removeBtnHtml = '<button type="button" onclick="requestDeleteParticipant(\'' + safeId + '\')" title="Remove from room" class="p-2 rounded-xl text-evergreen-800/45 hover:text-crimson-600 hover:bg-crimson-600/10 transition-colors shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
+                }
+
+                return '<div class="cozy-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 transition-transform hover:-translate-y-0.5">' +
+                    '<div class="flex items-center gap-3.5">' +
+                        avatarHtml +
+                        '<div class="min-w-0 flex-1">' +
+                            '<h4 class="font-serif text-lg font-bold text-evergreen-950 truncate flex items-center">' + escapeHtml(participant.name) + youPill + '</h4>' +
+                            '<p class="text-xs text-evergreen-800/70 flex items-center gap-1">' +
+                                '<i data-lucide="heart" class="w-3 h-3 text-crimson-600"></i>' +
+                                '<span>' + itemCount + (itemCount === 1 ? ' wish item' : ' wish items') + '</span>' +
+                            '</p>' +
+                        '</div>' +
+                        removeBtnHtml +
+                    '</div>' +
+                    '<div class="flex items-center gap-2 pt-1">' +
+                        '<button type="button" onclick="openWishlistModal(\'' + safeId + '\')" class="flex-1 py-2.5 px-3 rounded-xl bg-cream-100 hover:bg-cream-200 border border-evergreen-800/10 text-evergreen-900 font-bold text-xs transition-colors">View List</button>' +
+                        rightButtonHtml +
+                    '</div>' +
+                '</div>';
+            }
+
+            window.switchRoomTab = function(tabName) {
+                var myExisting = findMyParticipantInRoom(currentGroupData);
+                if (tabName === 'register' && currentGroupData) {
+                    if (isWishlistDeadlinePassed(currentGroupData)) {
+                        showToast('The wishlist deadline has passed.', 'error');
+                        return;
+                    }
+                    if (currentGroupData.status === 'drawn' && !myExisting) {
+                        showToast('New registrations are closed after the draw.', 'info');
+                        return;
+                    }
+                }
+                var isParticipants = tabName === 'participants';
+                document.getElementById('participantsTabContent').classList.toggle('hidden', !isParticipants);
+                document.getElementById('registerTabContent').classList.toggle('hidden', isParticipants);
+
+                var tabPartBtn = document.getElementById('tabParticipantsBtn');
+                var tabRegBtn = document.getElementById('tabRegisterBtn');
+
+                if (isParticipants) {
+                    tabPartBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-cream-50 text-evergreen-950 shadow';
+                    tabRegBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all text-cream-200 hover:text-white hover:bg-evergreen-800/60';
+                } else {
+                    tabRegBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-cream-50 text-evergreen-950 shadow';
+                    tabPartBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all text-cream-200 hover:text-white hover:bg-evergreen-800/60';
+                    if (myExisting) {
+                        loadParticipantIntoEditForm(myExisting);
+                    } else {
+                        window.resetParticipantForm();
+                    }
+                }
+                renderAllIcons();
+            };
+
+            // =================================================================
+            // WISHLIST FORM BUILDER & SAVE (USES SIGNED-IN PROFILE)
+            // =================================================================
+            window.addWishlistItemInput = function(itemData) {
+                var textVal = typeof itemData === 'object' && itemData !== null ? (itemData.text || '') : String(itemData || '');
+                var container = document.getElementById('wishlistInputsContainer');
+                var row = document.createElement('div');
+                row.className = 'wishlist-item-row flex items-start gap-2';
+                row.innerHTML = '<textarea rows="2" maxlength="300" placeholder="Gift idea or link (press Enter for a new line)..." oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" class="wishlist-item-field flex-1 px-4 py-2.5 rounded-xl bg-cream-100 border border-evergreen-800/15 text-evergreen-950 placeholder-evergreen-800/40 focus:outline-none focus:ring-2 focus:ring-crimson-600 text-sm resize-none leading-relaxed">' + escapeHtml(textVal) + '</textarea>' +
+                    '<button type="button" onclick="this.closest(\'.wishlist-item-row\').remove()" class="p-2.5 rounded-xl text-evergreen-800/50 hover:text-crimson-600 hover:bg-cream-200/60 shrink-0" title="Remove item"><i data-lucide="x" class="w-4 h-4"></i></button>';
+                container.appendChild(row);
+                var textarea = row.querySelector('textarea');
+                if (textarea && textVal) {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                }
+                renderAllIcons();
+            };
+
+            window.resetParticipantForm = function() {
+                document.getElementById('editingParticipantId').value = '';
+                document.getElementById('partNotesInput').value = '';
+                document.getElementById('formModeTitle').textContent = 'Add My Wishlist';
+                document.getElementById('saveParticipantBtnText').textContent = 'Save My Wishlist';
+                var labelEl = document.getElementById('wishlistFormUserLabel');
+                if (labelEl && currentUser) labelEl.textContent = currentUser.name;
+
+                var container = document.getElementById('wishlistInputsContainer');
+                container.innerHTML = '';
+                window.addWishlistItemInput('');
+                window.addWishlistItemInput('');
+                initAvatarPicker(currentUser ? currentUser.avatar : 'reindeer');
+            };
+
+            window.saveParticipantNow = function() {
+                if (!currentGroupData || !currentGroupId || !currentUser) return;
+                var editId = document.getElementById('editingParticipantId').value.trim();
+                if (isWishlistDeadlinePassed(currentGroupData)) {
+                    showToast('The wishlist deadline has passed.', 'error');
+                    window.switchRoomTab('participants');
+                    return;
+                }
+                if (currentGroupData.status === 'drawn' && !editId) {
+                    showToast('New registrations are closed after the draw.', 'error');
+                    window.switchRoomTab('participants');
+                    return;
+                }
+
+                var notes = document.getElementById('partNotesInput').value.trim();
+                var avatar = document.getElementById('partAvatarInput').value || currentUser.avatar || 'reindeer';
+
+                var fields = document.querySelectorAll('.wishlist-item-field');
+                var wishlist = [];
+                for (var i = 0; i < fields.length; i++) {
+                    var val = fields[i].value.trim();
+                    if (val) wishlist.push(val);
+                }
+
+                if (wishlist.length === 0) {
+                    showToast('Please add at least one wishlist item.', 'error');
+                    return;
+                }
+
+                var btn = document.getElementById('saveParticipantBtn');
+                if (btn) btn.disabled = true;
+
+                // Update user's preferred avatar if changed
+                if (currentUser.avatar !== avatar) {
+                    currentUser.avatar = avatar;
+                    updateHeaderUserUI();
+                    syncSaveUser(currentUser);
+                }
+
+                syncFetchRoom(currentGroupId).then(function(latestRoom) {
+                    var room = latestRoom || currentGroupData;
+                    var participants = Array.isArray(room.participants) ? room.participants.slice() : [];
+                    var existingMine = null;
+                    for (var k = 0; k < participants.length; k++) {
+                        if (isCurrentParticipantOwner(participants[k]) || participants[k].id === editId) {
+                            existingMine = participants[k];
+                            break;
+                        }
+                    }
+
+                    if (existingMine) {
+                        for (var j = 0; j < participants.length; j++) {
+                            if (participants[j].id === existingMine.id) {
+                                participants[j] = {
+                                    id: existingMine.id,
+                                    userId: currentUser.id,
+                                    name: currentUser.name,
+                                    pin: currentUser.pin,
+                                    wishlist: wishlist,
+                                    notes: notes,
+                                    avatar: avatar
+                                };
+                                break;
+                            }
+                        }
+                        showToast('Your wishlist has been updated!', 'success');
+                    } else {
+                        participants.push({
+                            id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+                            userId: currentUser.id,
+                            name: currentUser.name,
+                            pin: currentUser.pin,
+                            wishlist: wishlist,
+                            notes: notes,
+                            avatar: avatar
+                        });
+                        showToast('Wishlist added to room, ' + currentUser.name + '!', 'success');
+                    }
+
+                    room.participants = participants;
+                    currentGroupData = room;
+
+                    return syncSaveRoom(currentGroupId, room);
+                }).then(function() {
+                    if (btn) btn.disabled = false;
+                    window.resetParticipantForm();
+                    window.switchRoomTab('participants');
+                    renderRoomDashboard();
+                });
+            };
+
+            // =================================================================
+            // MODALS, PIN VERIFICATION, DRAW, REVEAL & DELETE ROOM
+            // =================================================================
+            window.openWishlistModal = function(participantId) {
+                if (!currentGroupData) return;
+                var participant = (currentGroupData.participants || []).find(function(p) { return p.id === participantId; });
+                if (!participant) return;
+
+                var avatar = getAvatarData(participant.avatar, participant.name);
+                var avatarEl = document.getElementById('viewWishlistAvatar');
+                avatarEl.className = 'w-12 h-12 rounded-2xl ' + avatar.bg + ' border flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1';
+                avatarEl.innerHTML = avatar.svg;
+
+                document.getElementById('viewWishlistName').textContent = participant.name + "'s Wishlist";
+                document.getElementById('viewWishlistItems').innerHTML = (participant.wishlist || []).map(function(item) {
+                    return renderWishlistItemCard(item, false);
+                }).join('');
+
+                var notesBox = document.getElementById('viewWishlistNotesBox');
+                if (participant.notes) {
+                    notesBox.classList.remove('hidden');
+                    document.getElementById('viewWishlistNotesText').textContent = participant.notes;
+                } else {
+                    notesBox.classList.add('hidden');
+                }
+
+                var isMine = isCurrentParticipantOwner(participant);
+                var editBtn = document.getElementById('editThisWishlistBtn');
+                editBtn.onclick = function() {
+                    if (isWishlistDeadlinePassed(currentGroupData)) {
+                        showToast('Wishlists are locked after the deadline.', 'error');
+                        return;
+                    }
+                    window.closeModal('wishlistViewModal');
+                    window.requestEditParticipant(participant.id);
+                };
+                editBtn.classList.toggle('hidden', !isMine || isWishlistDeadlinePassed(currentGroupData));
+
+                window.openModal('wishlistViewModal');
+            };
+
+            window.requestEditParticipant = function(participantId) {
+                if (!currentGroupData) return;
+                if (isWishlistDeadlinePassed(currentGroupData)) {
+                    showToast('Wishlists are locked after the deadline.', 'error');
+                    return;
+                }
+                var participant = (currentGroupData.participants || []).find(function(p) { return p.id === participantId; });
+                if (!participant) return;
+
+                if (isCurrentParticipantOwner(participant)) {
+                    loadParticipantIntoEditForm(participant);
+                    return;
+                }
+
+                pendingPinAction = { type: 'edit', participantId: participantId };
+                document.getElementById('pinModalTitle').textContent = 'Edit Your Wishlist';
+                document.getElementById('pinTargetName').textContent = participant.name;
+                document.getElementById('pinSubmitLabel').textContent = 'Continue to Edit';
+                document.getElementById('verifyPinInput').value = '';
+                document.getElementById('pinErrorMsg').classList.add('hidden');
+                window.openModal('pinModal');
+            };
+
+            window.requestRevealMatch = function(participantId) {
+                if (!currentGroupData) return;
+                var participant = (currentGroupData.participants || []).find(function(p) { return p.id === participantId; });
+                if (!participant) return;
+
+                // Automatically unlock if this card belongs to the currently logged-in user!
+                if (isCurrentParticipantOwner(participant)) {
+                    openPrivateRevealModal(participant);
+                    return;
+                }
+
+                pendingPinAction = { type: 'reveal', participantId: participantId };
+                document.getElementById('pinModalTitle').textContent = 'Private Match Reveal';
+                document.getElementById('pinTargetName').textContent = participant.name;
+                document.getElementById('pinSubmitLabel').textContent = 'Unlock My Match';
+                document.getElementById('verifyPinInput').value = '';
+                document.getElementById('pinErrorMsg').classList.add('hidden');
+                window.openModal('pinModal');
+            };
+
+            window.requestDeleteParticipant = function(participantId) {
+                if (!currentGroupData || currentGroupData.status === 'drawn') return;
+                if (!isCurrentUserHost(currentGroupData)) {
+                    showToast('Only the room host can remove participants.', 'error');
+                    return;
+                }
+                var participant = (currentGroupData.participants || []).find(function(p) { return p.id === participantId; });
+                if (!participant) return;
+
+                pendingDeleteParticipantId = participant.id;
+                document.getElementById('deleteTargetName').textContent = participant.name;
+                window.openModal('deleteParticipantModal');
+            };
+
+            window.confirmDeleteParticipant = function() {
+                if (!pendingDeleteParticipantId || !currentGroupData || !currentGroupId) return;
+                if (!isCurrentUserHost(currentGroupData)) return;
+
+                var targetId = pendingDeleteParticipantId;
+                pendingDeleteParticipantId = null;
+
+                syncFetchRoom(currentGroupId).then(function(latestRoom) {
+                    var room = latestRoom || currentGroupData;
+                    var removed = (room.participants || []).find(function(p) { return p.id === targetId; });
+                    room.participants = (room.participants || []).filter(function(p) { return p.id !== targetId; });
+                    currentGroupData = room;
+                    return syncSaveRoom(currentGroupId, room).then(function() { return removed; });
+                }).then(function(removed) {
+                    window.closeModal('deleteParticipantModal');
+                    renderRoomDashboard();
+                    showToast((removed ? removed.name : 'Participant') + ' removed from the room.', 'info');
+                });
+            };
+
+            window.openDeleteRoomModal = function() {
+                if (!currentGroupData || !isCurrentUserHost(currentGroupData)) return;
+                document.getElementById('deleteRoomTargetName').textContent = currentGroupData.name || currentGroupData.code;
+                window.openModal('deleteRoomModal');
+            };
+
+            window.confirmDeleteRoom = function() {
+                if (!currentGroupData || !currentGroupId || !isCurrentUserHost(currentGroupData)) return;
+                var upperCode = currentGroupId.toUpperCase();
+                var btn = document.getElementById('confirmDeleteRoomBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Deleting...';
+                }
+
+                delete memoryRooms[upperCode];
+                removeStore('ss2027_room_' + upperCode);
+                removeStore('ss2027_active_room');
+                window.removeSavedRoom(upperCode);
+
+                fetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode), {
+                    method: "DELETE"
+                }).catch(function() { return null; }).then(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Delete Room';
+                    }
+                    window.closeModal('deleteRoomModal');
+                    window.goHome();
+                    showToast('Room "' + upperCode + '" has been deleted.', 'info');
+                });
+            };
+
+            window.verifyPinNow = function() {
+                if (!pendingPinAction || !currentGroupData) return;
+                var enteredPin = document.getElementById('verifyPinInput').value.trim();
+
+                var participant = (currentGroupData.participants || []).find(function(p) { return p.id === pendingPinAction.participantId; });
+                if (!participant || enteredPin !== participant.pin) {
+                    document.getElementById('pinErrorMsg').classList.remove('hidden');
+                    return;
+                }
+
+                window.closeModal('pinModal');
+
+                if (pendingPinAction.type === 'edit') {
+                    loadParticipantIntoEditForm(participant);
+                } else if (pendingPinAction.type === 'reveal') {
+                    openPrivateRevealModal(participant);
+                }
+            };
+
+            function loadParticipantIntoEditForm(participant) {
+                document.getElementById('editingParticipantId').value = participant.id;
+                document.getElementById('participantsTabContent').classList.add('hidden');
+                document.getElementById('registerTabContent').classList.remove('hidden');
+
+                var tabPartBtn = document.getElementById('tabParticipantsBtn');
+                var tabRegBtn = document.getElementById('tabRegisterBtn');
+                tabRegBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-cream-50 text-evergreen-950 shadow';
+                tabPartBtn.className = 'flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all text-cream-200 hover:text-white hover:bg-evergreen-800/60';
+
+                var labelEl = document.getElementById('wishlistFormUserLabel');
+                if (labelEl && currentUser) labelEl.textContent = currentUser.name;
+                document.getElementById('partNotesInput').value = participant.notes || '';
+                document.getElementById('formModeTitle').textContent = 'Edit My Wishlist';
+                document.getElementById('saveParticipantBtnText').textContent = 'Update My Wishlist';
+
+                var container = document.getElementById('wishlistInputsContainer');
+                container.innerHTML = '';
+                (participant.wishlist || []).forEach(function(item) { window.addWishlistItemInput(item); });
+                initAvatarPicker(participant.avatar || 'reindeer');
+                renderAllIcons();
+            }
+
+            function generateDerangementAssignments(participants) {
+                var ids = participants.map(function(p) { return p.id; });
+                var receivers = ids.slice();
+                var valid = false;
+                var attempts = 0;
+
+                while (!valid && attempts < 200) {
+                    attempts++;
+                    for (var i = receivers.length - 1; i > 0; i--) {
+                        var j = Math.floor(Math.random() * (i + 1));
+                        var tmp = receivers[i];
+                        receivers[i] = receivers[j];
+                        receivers[j] = tmp;
+                    }
+                    valid = ids.every(function(giverId, idx) { return giverId !== receivers[idx]; });
+                }
+
+                if (!valid) {
+                    receivers = ids.map(function(_, idx) { return ids[(idx + 1) % ids.length]; });
+                }
+
+                var map = {};
+                ids.forEach(function(giverId, idx) {
+                    map[giverId] = receivers[idx];
+                });
+                return map;
+            }
+
+            window.triggerSecretSantaDraw = function() {
+                if (!currentGroupData || !currentGroupId) return;
+                if (!isCurrentUserHost(currentGroupData)) {
+                    showToast('Only the room host can draw names.', 'error');
+                    return;
+                }
+
+                var drawBtn = document.getElementById('drawNamesBtn');
+                if (drawBtn) drawBtn.disabled = true;
+
+                syncFetchRoom(currentGroupId).then(function(latestRoom) {
+                    var room = latestRoom || currentGroupData;
+                    var participants = Array.isArray(room.participants) ? room.participants : [];
+                    if (participants.length < 3) {
+                        showToast('At least 3 friends must join before drawing names.', 'error');
+                        if (drawBtn) drawBtn.disabled = false;
+                        return;
+                    }
+
+                    room.status = 'drawn';
+                    room.assignments = generateDerangementAssignments(participants);
+                    currentGroupData = room;
+
+                    return syncSaveRoom(currentGroupId, room).then(function() {
+                        renderRoomDashboard();
+                        fireFestiveConfetti();
+                        showToast('Secret Santa names have been drawn!', 'success');
+                    });
+                });
+            };
+
+            window.openResetConfirmModal = function() {
+                if (!currentGroupData || !isCurrentUserHost(currentGroupData)) return;
+                window.openModal('resetConfirmModal');
+            };
+
+            window.confirmResetDraw = function() {
+                if (!currentGroupId || !isCurrentUserHost(currentGroupData)) return;
+                syncFetchRoom(currentGroupId).then(function(latestRoom) {
+                    var room = latestRoom || currentGroupData;
+                    room.status = 'open';
+                    room.assignments = {};
+                    currentGroupData = room;
+                    return syncSaveRoom(currentGroupId, room);
+                }).then(function() {
+                    window.closeModal('resetConfirmModal');
+                    renderRoomDashboard();
+                    showToast('Draw reset. Friends can edit wishlists again.', 'info');
+                });
+            };
+
+            function openPrivateRevealModal(santaParticipant) {
+                if (!currentGroupData || !currentGroupData.assignments) return;
+                var recipientId = currentGroupData.assignments[santaParticipant.id];
+                var recipient = (currentGroupData.participants || []).find(function(p) { return p.id === recipientId; });
+                if (!recipient) {
+                    showToast('Could not find assigned recipient.', 'error');
+                    return;
+                }
+
+                document.getElementById('revealSantaName').textContent = santaParticipant.name;
+                document.getElementById('recipientNameDisplay').textContent = recipient.name;
+                document.getElementById('revealBudgetTag').textContent = currentGroupData.budget
+                    ? 'Budget: ' + currentGroupData.budget
+                    : 'No budget limit';
+                document.getElementById('revealDateTag').textContent = formatDisplayDate(currentGroupData.date);
+
+                document.getElementById('recipientWishlistDisplay').innerHTML = (recipient.wishlist || []).map(function(item) {
+                    return renderWishlistItemCard(item, true);
+                }).join('');
+
+                var notesBox = document.getElementById('recipientNotesBox');
+                if (recipient.notes) {
+                    notesBox.classList.remove('hidden');
+                    document.getElementById('recipientNotesText').textContent = recipient.notes;
+                } else {
+                    notesBox.classList.add('hidden');
+                }
+
+                document.getElementById('wrappedCoverView').classList.remove('hidden');
+                document.getElementById('unwrappedContentView').classList.add('hidden');
+                window.openModal('revealModal');
+            }
+
+            window.unwrapGiftCard = function() {
+                document.getElementById('wrappedCoverView').classList.add('hidden');
+                document.getElementById('unwrappedContentView').classList.remove('hidden');
+                fireFestiveConfetti();
+            };
+
+            window.closeRevealModal = function() {
+                document.getElementById('wrappedCoverView').classList.remove('hidden');
+                document.getElementById('unwrappedContentView').classList.add('hidden');
+                window.closeModal('revealModal');
+            };
+
+            window.copyInviteInfo = function() {
+                if (!currentGroupData || !currentGroupData.code) return;
+                var codeOnly = currentGroupData.code;
+
+                var tempInput = document.createElement('input');
+                tempInput.value = codeOnly;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+
+                showToast('Copied room code: ' + codeOnly, 'success');
+            };
+
+            window.openModal = function(id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+                renderAllIcons();
+            };
+
+            window.closeModal = function(id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            };
+
+            function showToast(message, type) {
+                var container = document.getElementById('toastContainer');
+                if (!container) return;
+
+                var colors = {
+                    success: 'bg-emerald-800/95 border-emerald-400/40 text-cream-50',
+                    error: 'bg-crimson-700/95 border-red-300/40 text-cream-50',
+                    info: 'bg-evergreen-900/95 border-gold-400/40 text-cream-50'
+                };
+                var icons = {
+                    success: 'check-circle-2',
+                    error: 'alert-circle',
+                    info: 'sparkles'
+                };
+
+                var toast = document.createElement('div');
+                toast.className = 'pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-semibold transition-all duration-300 ' + (colors[type] || colors.info);
+                toast.innerHTML = '<i data-lucide="' + (icons[type] || icons.info) + '" class="w-4 h-4 shrink-0 text-gold-400"></i><span class="flex-1">' + escapeHtml(message) + '</span>';
+                container.appendChild(toast);
+                renderAllIcons();
+
+                setTimeout(function() {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(-6px)';
+                    setTimeout(function() { toast.remove(); }, 300);
+                }, 3400);
+            }
+
+            function renderWishlistItemCard(item, asListItem) {
+                var isObj = typeof item === 'object' && item !== null;
+                var text = isObj ? (item.text || '') : String(item || '');
+                var tag = asListItem ? 'li' : 'div';
+                var escaped = escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline text-crimson-700 hover:text-crimson-600">$1</a>');
+
+                return '<' + tag + ' class="p-3 rounded-xl bg-cream-100 border border-evergreen-800/10 text-xs sm:text-sm text-evergreen-950">' +
+                    '<div class="flex items-start gap-2.5">' +
+                        '<span class="text-crimson-600 font-bold">•</span>' +
+                        '<span class="break-words whitespace-pre-line flex-1">' + escaped + '</span>' +
+                    '</div>' +
+                '</' + tag + '>';
+            }
+
+            function fireFestiveConfetti() {
+                if (typeof confetti !== 'function') return;
+                confetti({
+                    particleCount: 85,
+                    spread: 70,
+                    origin: { y: 0.65 },
+                    colors: ['#C82828', '#F2C94C', '#FDFBF7', '#2E7D5B']
+                });
+            }
+
+            function initSnowfall() {
+                var canvas = document.getElementById('snowCanvas');
+                if (!canvas) return;
+                var ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                var width = canvas.width = window.innerWidth;
+                var height = canvas.height = window.innerHeight;
+
+                window.addEventListener('resize', function() {
+                    width = canvas.width = window.innerWidth;
+                    height = canvas.height = window.innerHeight;
+                });
+
+                var flakeCount = Math.min(65, Math.floor(width / 20));
+                var flakes = [];
+                for (var i = 0; i < flakeCount; i++) {
+                    flakes.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        r: 1.2 + Math.random() * 2.5,
+                        d: 0.35 + Math.random() * 0.75,
+                        drift: (Math.random() - 0.5) * 0.45
+                    });
+                }
+
+                function drawSnow() {
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.fillStyle = 'rgba(253, 251, 247, 0.4)';
+                    ctx.beginPath();
+                    for (var i = 0; i < flakes.length; i++) {
+                        var f = flakes[i];
+                        ctx.moveTo(f.x, f.y);
+                        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2, true);
+                    }
+                    ctx.fill();
+
+                    for (var j = 0; j < flakes.length; j++) {
+                        var fl = flakes[j];
+                        fl.y += fl.d;
+                        fl.x += fl.drift;
+                        if (fl.y > height) { fl.y = -5; fl.x = Math.random() * width; }
+                        if (fl.x > width) fl.x = 0;
+                        if (fl.x < 0) fl.x = width;
+                    }
+                    requestAnimationFrame(drawSnow);
+                }
+
+                drawSnow();
+            }
+
+            function formatDisplayDate(dateStr) {
+                if (!dateStr) return 'Date TBD';
+                try {
+                    var parsed = new Date(dateStr + 'T00:00:00');
+                    if (isNaN(parsed.getTime())) return dateStr;
+                    return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                } catch (e) {
+                    return dateStr;
+                }
+            }
+
+            // Boot immediately: check signed-in user first!
+            renderAllIcons();
+            initSnowfall();
+            initAuthAvatarPicker('reindeer');
+            initAvatarPicker('reindeer');
+
+            try {
+                var savedUserRaw = getStore('ss2027_current_user');
+                if (savedUserRaw) {
+                    var parsedUser = JSON.parse(savedUserRaw);
+                    if (parsedUser && parsedUser.name && parsedUser.pin) {
+                        completeUserSignIn(parsedUser);
+                        // Also refresh user profile in background from cloud
+                        syncFetchUser(parsedUser.name).then(function(cloudUser) {
+                            if (cloudUser && cloudUser.pin === parsedUser.pin && currentUser) {
+                                currentUser = cloudUser;
+                                setStore('ss2027_current_user', JSON.stringify(cloudUser));
+                                updateHeaderUserUI();
+                                renderLandingRooms();
+                            }
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {}
+
+            showView('authView');
+        })();
+    </script>
+</body>
+</html>
