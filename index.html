@@ -1267,6 +1267,18 @@
                 }
             }
 
+            // fetch with a hard time limit so a slow/blocked service can never freeze the page
+            function tfetch(url, opts, ms) {
+                if (typeof AbortController === 'undefined') return fetch(url, opts);
+                var ctrl = new AbortController();
+                var timer = setTimeout(function() { try { ctrl.abort(); } catch (e) {} }, ms || (String(url).indexOf('ntfy.sh') !== -1 ? 2500 : 8000));
+                var o = {};
+                Object.keys(opts || {}).forEach(function(k) { o[k] = opts[k]; });
+                o.signal = ctrl.signal;
+                return fetch(url, o).then(function(r) { clearTimeout(timer); return r; },
+                                          function(e) { clearTimeout(timer); throw e; });
+            }
+
             function syncSaveUser(userObj) {
                 var key = normalizeUserKey(userObj.name);
                 userObj.updatedAt = Date.now();
@@ -1274,18 +1286,19 @@
                 setStore('ss2027_user_doc_' + key, JSON.stringify(userObj));
                 setStore('ss2027_current_user', JSON.stringify(userObj));
 
-                var fsReq = fetch(FIRESTORE_USER_BASE + encodeURIComponent(key), {
+                var fsReq = tfetch(FIRESTORE_USER_BASE + encodeURIComponent(key), {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(encodeFirestoreFields(userObj))
                 }).catch(function() { return null; });
 
-                var ntfyReq = fetch(NTFY_USER_PREFIX + encodeURIComponent(key), {
+                var ntfyReq = tfetch(NTFY_USER_PREFIX + encodeURIComponent(key), {
                     method: "POST",
                     body: JSON.stringify(userObj)
                 }).catch(function() { return null; });
 
-                return Promise.all([fsReq, ntfyReq]);
+                // ntfy is only a backup copy: do not make the user wait for it
+                return Promise.all([fsReq]);
             }
 
             function syncFetchUser(name) {
@@ -1300,14 +1313,14 @@
                     }
                 }
 
-                var fsFetch = fetch(FIRESTORE_USER_BASE + encodeURIComponent(key) + "?t=" + Date.now(), {
+                var fsFetch = tfetch(FIRESTORE_USER_BASE + encodeURIComponent(key) + "?t=" + Date.now(), {
                     method: "GET"
                 }).then(function(res) {
                     if (!res.ok) return null;
                     return res.json().then(decodeFirestoreDoc);
                 }).catch(function() { return null; });
 
-                var ntfyFetch = fetch(NTFY_USER_PREFIX + encodeURIComponent(key) + "/json?poll=1&since=all", {
+                var ntfyFetch = tfetch(NTFY_USER_PREFIX + encodeURIComponent(key) + "/json?poll=1&since=all", {
                     method: "GET"
                 }).then(function(res) {
                     if (!res.ok) return null;
@@ -2254,18 +2267,18 @@
                 roomObj.updatedAt = Date.now();
                 saveRoomLocally(upperCode, roomObj);
 
-                var firestoreReq = fetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode), {
+                var firestoreReq = tfetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode), {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(encodeFirestoreFields(roomObj))
                 }).catch(function() { return null; });
 
-                var ntfyReq = fetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode), {
+                var ntfyReq = tfetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode), {
                     method: "POST",
                     body: JSON.stringify(roomObj)
                 }).catch(function() { return null; });
 
-                return Promise.all([firestoreReq, ntfyReq]).then(function(r) {
+                return Promise.all([firestoreReq]).then(function(r) {
                     // Tell the Telegram notifier that the room changed (it decides who to message)
                     if (SCRIPT_URL && SCRIPT_URL.indexOf('PASTE') !== 0) {
                         tgApi({ action: 'notify', room: upperCode });
@@ -2277,14 +2290,14 @@
             function syncFetchRoom(code) {
                 var upperCode = code.toUpperCase();
 
-                var firestoreFetch = fetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode) + "?t=" + Date.now(), {
+                var firestoreFetch = tfetch(FIRESTORE_DOC_BASE + encodeURIComponent(upperCode) + "?t=" + Date.now(), {
                     method: "GET"
                 }).then(function(res) {
                     if (!res.ok) return null;
                     return res.json().then(decodeFirestoreDoc);
                 }).catch(function() { return null; });
 
-                var ntfyFetch = fetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode) + "/json?poll=1&since=all", {
+                var ntfyFetch = tfetch(NTFY_TOPIC_PREFIX + encodeURIComponent(upperCode) + "/json?poll=1&since=all", {
                     method: "GET"
                 }).then(function(res) {
                     if (!res.ok) return null;
