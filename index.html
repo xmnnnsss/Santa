@@ -649,7 +649,7 @@
                         <div class="space-y-3 pt-1">
                             <div class="flex items-center justify-between">
                                 <label class="block text-xs font-bold uppercase tracking-wider text-evergreen-800">
-                                    Your Wishlist Ideas *
+                                    Your Wishlist Ideas <span class="normal-case font-semibold text-evergreen-800/60">(optional — you can add it later)</span>
                                 </label>
                                 <button type="button" onclick="addWishlistItemInput()"
                                     class="text-xs font-bold text-crimson-600 hover:text-crimson-700 flex items-center gap-1">
@@ -805,6 +805,27 @@
                 <button type="button" onclick="closeRevealModal()"
                     class="w-full py-3.5 rounded-xl bg-evergreen-900 hover:bg-evergreen-800 text-cream-50 font-bold text-sm">
                     Got It, Hide Secret!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 9: DRAW CONFIRMATION -->
+    <div id="drawConfirmModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-evergreen-950/80 backdrop-blur-sm">
+        <div class="cozy-card rounded-3xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-crimson-600/10 text-crimson-600 flex items-center justify-center mx-auto">
+                <i data-lucide="sparkles" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-serif text-xl font-bold text-evergreen-950">Draw names now?</h3>
+                <p class="text-xs text-evergreen-800/75 mt-1">Everyone will be matched with a secret recipient and new friends will no longer be able to join. You can reset the draw later if needed.</p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button type="button" onclick="closeModal('drawConfirmModal')" class="flex-1 py-3 rounded-xl bg-cream-200 text-evergreen-900 font-bold text-xs">
+                    Not yet
+                </button>
+                <button type="button" onclick="confirmSecretSantaDraw()" class="flex-1 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold text-xs">
+                    Yes, Draw!
                 </button>
             </div>
         </div>
@@ -2724,10 +2745,6 @@
                     if (val) wishlist.push(val);
                 }
 
-                if (wishlist.length === 0) {
-                    showToast('Please add at least one wishlist item.', 'error');
-                    return;
-                }
 
                 var btn = document.getElementById('saveParticipantBtn');
                 if (btn) btn.disabled = true;
@@ -2776,7 +2793,7 @@
                             notes: notes,
                             avatar: avatar
                         });
-                        showToast('Wishlist added to room, ' + currentUser.name + '!', 'success');
+                        showToast(wishlist.length ? 'Wishlist added to room, ' + currentUser.name + '!' : 'You joined the room, ' + currentUser.name + '! You can add your wishlist later.', 'success');
                     }
 
                     room.participants = participants;
@@ -2805,9 +2822,9 @@
                 avatarEl.innerHTML = avatar.svg;
 
                 document.getElementById('viewWishlistName').textContent = participant.name + "'s Wishlist";
-                document.getElementById('viewWishlistItems').innerHTML = (participant.wishlist || []).map(function(item) {
-                    return renderWishlistItemCard(item, false);
-                }).join('');
+                document.getElementById('viewWishlistItems').innerHTML = (participant.wishlist || []).length
+                    ? (participant.wishlist || []).map(function(item) { return renderWishlistItemCard(item, false); }).join('')
+                    : '<p class="text-sm text-evergreen-800/65 italic py-2">No wishlist yet. Check back later!</p>';
 
                 var notesBox = document.getElementById('viewWishlistNotesBox');
                 if (participant.notes) {
@@ -3018,6 +3035,17 @@
                     showToast('Only the room host can draw names.', 'error');
                     return;
                 }
+                var count = Array.isArray(currentGroupData.participants) ? currentGroupData.participants.length : 0;
+                if (count < 3) {
+                    showToast('At least 3 friends must join before drawing names.', 'error');
+                    return;
+                }
+                window.openModal('drawConfirmModal');
+            };
+
+            window.confirmSecretSantaDraw = function() {
+                window.closeModal('drawConfirmModal');
+                if (!currentGroupData || !currentGroupId || !isCurrentUserHost(currentGroupData)) return;
 
                 var drawBtn = document.getElementById('drawNamesBtn');
                 if (drawBtn) drawBtn.disabled = true;
@@ -3079,9 +3107,9 @@
                     : 'No budget limit';
                 document.getElementById('revealDateTag').textContent = formatDisplayDate(currentGroupData.date);
 
-                document.getElementById('recipientWishlistDisplay').innerHTML = (recipient.wishlist || []).map(function(item) {
-                    return renderWishlistItemCard(item, true);
-                }).join('');
+                document.getElementById('recipientWishlistDisplay').innerHTML = (recipient.wishlist || []).length
+                    ? (recipient.wishlist || []).map(function(item) { return renderWishlistItemCard(item, true); }).join('')
+                    : '<p class="text-sm text-evergreen-800/70 italic py-2">No wishlist yet — you will get a notification when they add one.</p>';
 
                 var notesBox = document.getElementById('recipientNotesBox');
                 if (recipient.notes) {
