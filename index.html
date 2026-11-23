@@ -498,6 +498,18 @@
 
                 <!-- Left 2 Columns: Friends List -->
                 <div class="lg:col-span-2 space-y-4">
+                    <div id="quickJoinBox" class="hidden glass-panel rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                        <div>
+                            <p class="font-serif text-lg font-bold text-cream-50">You are not in this room yet</p>
+                            <p class="text-xs text-cream-200/80 mt-0.5">Join in one click. You can add your wishlist later.</p>
+                        </div>
+                        <button type="button" id="quickJoinBtn" onclick="quickJoinRoom()"
+                            class="shrink-0 px-5 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-700 disabled:opacity-60 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-colors">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>Join this room</span>
+                        </button>
+                    </div>
+
                     <div class="flex items-center justify-between px-1">
                         <h3 class="font-serif text-xl font-bold text-cream-50 flex items-center gap-2">
                             <i data-lucide="sparkles" class="w-4 h-4 text-gold-400"></i>
@@ -2544,8 +2556,10 @@
                 var tabRegisterBtn = document.getElementById('tabRegisterBtn');
                 var registerTabLabel = document.getElementById('registerTabLabel');
                 if (registerTabLabel) {
-                    registerTabLabel.textContent = myEntry ? 'Edit My Wishlist' : 'Add My Wishlist';
+                    registerTabLabel.textContent = myEntry ? 'Edit My Wishlist' : 'Join & Add Wishlist';
                 }
+                var quickJoinBox = document.getElementById('quickJoinBox');
+                if (quickJoinBox) quickJoinBox.classList.toggle('hidden', !!myEntry || isDrawn || deadlinePassed);
                 if (tabRegisterBtn) {
                     var hideRegTab = deadlinePassed || (isDrawn && !myEntry);
                     tabRegisterBtn.classList.toggle('hidden', hideRegTab);
@@ -2719,6 +2733,49 @@
                 window.addWishlistItemInput('');
                 window.addWishlistItemInput('');
                 initAvatarPicker(currentUser ? currentUser.avatar : 'reindeer');
+            };
+
+            window.quickJoinRoom = function() {
+                if (!currentGroupData || !currentGroupId || !currentUser) return;
+                if (isWishlistDeadlinePassed(currentGroupData)) {
+                    showToast('The wishlist deadline has passed.', 'error');
+                    return;
+                }
+                var btn = document.getElementById('quickJoinBtn');
+                if (btn) btn.disabled = true;
+
+                syncFetchRoom(currentGroupId).then(function(latestRoom) {
+                    var room = latestRoom || currentGroupData;
+                    if (room.status === 'drawn') {
+                        showToast('New registrations are closed after the draw.', 'error');
+                        return;
+                    }
+                    var participants = Array.isArray(room.participants) ? room.participants.slice() : [];
+                    var already = participants.some(function(p) { return isCurrentParticipantOwner(p); });
+                    if (!already) {
+                        participants.push({
+                            id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+                            userId: currentUser.id,
+                            name: currentUser.name,
+                            pin: currentUser.pin,
+                            wishlist: [],
+                            notes: '',
+                            avatar: currentUser.avatar || 'reindeer'
+                        });
+                        room.participants = participants;
+                        currentGroupData = room;
+                        return syncSaveRoom(currentGroupId, room).then(function() {
+                            showToast('You joined the room, ' + currentUser.name + '! Add your wishlist when you are ready.', 'success');
+                        });
+                    }
+                    currentGroupData = room;
+                }).then(function() {
+                    if (btn) btn.disabled = false;
+                    renderRoomDashboard();
+                }).catch(function() {
+                    if (btn) btn.disabled = false;
+                    showToast('Could not join the room. Please try again.', 'error');
+                });
             };
 
             window.saveParticipantNow = function() {
